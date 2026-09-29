@@ -9,7 +9,7 @@ Pass-and-play trivia for a group of friends on one phone or laptop.
   better than the last (Nursing & Health goes Penlight, Pulse Oximeter, Stethoscope, Crash Cart,
   Nightingale Lamp). See the ladders in `js/rewards.js` and your progress in the Trophy case.
 - Theme picker (top of every screen): match device, light or dark, plus five accent colors. Saved per device.
-- Avatars: build your own (skin, hair, expression, headwear, shirt, background) and show off up to three unlocked rewards.
+- Avatars: a shaded head-and-shoulders portrait you build (skin, eyes, hair, expression, headwear, shirt, background, and one of 55 objects to hold) and show off up to three unlocked rewards.
 - Players: everyone's avatar and trophies, plus a category-strength chart (right answers and accuracy per category).
 - Trash talk (online only): one public board for the whole group with @mentions. There are no private messages.
 - Leaderboard: today's Daily Challenge results and all-time Daily Challenge points.

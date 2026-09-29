@@ -684,7 +684,10 @@ a { color: var(--brass); }
 }
 
 /* Avatars */
-.avatar { flex: none; border-radius: 50%; display: block; }
+.avatar { flex: none; display: block; overflow: visible; }
+.avatar-item-bg { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.item-grid { max-height: 260px; overflow-y: auto; padding: 2px; }
+.item-emoji { font-size: 1.15rem; line-height: 1; }
 .avatar-bg { fill: var(--cat, var(--brass)); }
 .avatar-preview { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 .avatar-preview > .stack { min-width: 0; flex: 1; }
