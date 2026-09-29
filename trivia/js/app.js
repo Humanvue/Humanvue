@@ -1025,11 +1025,12 @@
   function viewAvatar() {
     var a = state.avatarDraft || (state.avatarDraft = Avatar.normalize(myAvatar()));
     var picks = state.showcaseDraft || (state.showcaseDraft = (state.profile.showcase || []).slice());
-    var rows = Object.keys(Avatar.OPTIONS).map(function (k) {
+    var rows = Avatar.ORDER.map(function (k) {
       var opts = Avatar.OPTIONS[k].map(function (v) {
         var on = a[k] === v;
         var inner;
         if (k === 'skin' || k === 'hairColor' || k === 'shirt' || k === 'eyes') inner = '<span class="swatch-dot" style="background:' + v + '"></span>';
+        else if (k === 'body') inner = v === 'person' ? 'Person' : '<span class="item-emoji" aria-hidden="true">' + Avatar.ITEMS[v].emoji + '</span>' + esc(Avatar.ITEMS[v].name);
         else if (k === 'item') inner = (Avatar.ITEMS[v].emoji ? '<span class="item-emoji" aria-hidden="true">' + Avatar.ITEMS[v].emoji + '</span>' : '') + esc(Avatar.ITEMS[v].name);
         else if (k === 'bg') inner = '<span class="swatch-dot" data-cat="' + v + '" style="background:var(--cat)"></span>' + esc(catName(v));
         else inner = esc(v.charAt(0).toUpperCase() + v.slice(1));
@@ -1037,7 +1038,7 @@
           ' aria-label="' + esc(Avatar.LABELS[k] + ' ' + v) + '">' + inner + '</button>';
       }).join('');
       return '<div class="field"><span class="label">' + Avatar.LABELS[k] + (k === 'item' ? ' · ' + (Avatar.OPTIONS.item.length - 1) + ' objects' : '') + '</span>' +
-        '<div class="chips' + (k === 'item' ? ' item-grid' : '') + '">' + opts + '</div></div>';
+        '<div class="chips' + (k === 'item' || k === 'body' ? ' item-grid' : '') + '">' + opts + '</div></div>';
     }).join('');
 
     var key = myTallyKey();

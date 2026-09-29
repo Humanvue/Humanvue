@@ -26,16 +26,19 @@
     hair: ['none', 'buzz', 'short', 'curly', 'long', 'bun'],
     hairColor: ['#1f1a17', '#4a2f1e', '#8a5a2b', '#c99a4b', '#b7b2a8', '#a33a2a'],
     face: ['smile', 'grin', 'smirk', 'focused'],
+    glasses: ['none', 'round', 'square', 'aviators', 'goggles'],
     hat: ['none', 'beret', 'scrub cap', 'ball cap', 'headset'],
     shirt: ['#56702a', '#16807f', '#2c67ad', '#b3322f', '#34427a', '#1a1e18'],
     bg: ['military', 'nursing', 'science', 'pop', 'sports', 'geo', 'politics', 'ushistory', 'worldhistory', 'philosophy', 'film', 'lit', 'auto'],
-    item: ITEMS.map(function (i) { return i[0]; })
+    item: ITEMS.map(function (i) { return i[0]; }),
+    // 'person', or any object from the list with a face, hair and hats on it.
+    body: ['person'].concat(ITEMS.slice(1).map(function (i) { return i[0]; }))
   };
 
-  var LABELS = { skin: 'Skin tone', eyes: 'Eye color', hair: 'Hair', hairColor: 'Hair color', face: 'Expression',
-    hat: 'Headwear', shirt: 'Shirt', bg: 'Background', item: 'Holding' };
+  var LABELS = { body: 'Avatar is', skin: 'Skin tone', eyes: 'Eye color', hair: 'Hair', hairColor: 'Hair color', face: 'Expression',
+    glasses: 'Glasses', hat: 'Headwear', shirt: 'Shirt', bg: 'Background', item: 'Holding' };
 
-  var DEFAULT = { skin: '#d39a6a', eyes: '#5b3a1e', hair: 'short', hairColor: '#1f1a17', face: 'smile', hat: 'none',
+  var DEFAULT = { body: 'person', skin: '#d39a6a', eyes: '#5b3a1e', hair: 'short', hairColor: '#1f1a17', face: 'smile', glasses: 'none', hat: 'none',
     shirt: '#56702a', bg: 'military', item: 'none' };
 
   var ITEM_BY_ID = {};
@@ -54,7 +57,7 @@
     var h = 0;
     for (var i = 0; i < (name || '').length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
     var pick = function (k, salt) { var list = OPTIONS[k]; return list[(h >>> salt) % list.length]; };
-    return { skin: pick('skin', 1), eyes: pick('eyes', 3), hair: pick('hair', 5), hairColor: pick('hairColor', 8), face: pick('face', 11),
+    return { body: 'person', glasses: 'none', skin: pick('skin', 1), eyes: pick('eyes', 3), hair: pick('hair', 5), hairColor: pick('hairColor', 8), face: pick('face', 11),
       hat: 'none', shirt: pick('shirt', 14), bg: pick('bg', 17), item: 'none' };
   }
 
@@ -96,6 +99,8 @@
           '<path d="M64 32 C60 38 54 41 47 42" stroke="' + dark + '" stroke-width="1" fill="none" opacity="0.5"/>';
       case 'bun':
         return '<path d="M39 50 C38 31 48 23 60 23 C72 23 82 31 81 50 C79 41 72 35 60 34 C48 35 41 41 39 50Z" fill="' + fill + '"/>';
+      case 'object':
+        return '';
       default:
         return '<ellipse cx="54" cy="31" rx="7" ry="3" fill="#ffffff" opacity="0.18"/>';
     }
@@ -146,6 +151,31 @@
       '<path d="' + d[0] + '"/><path d="' + d[1] + '"/></g>';
   }
 
+  function glassesSvg(style) {
+    var frame = '#1f1a17';
+    switch (style) {
+      case 'round':
+        return '<g fill="#ffffff" fill-opacity="0.12" stroke="' + frame + '" stroke-width="1.6">' +
+          '<circle cx="50" cy="54" r="6.6"/><circle cx="70" cy="54" r="6.6"/></g>' +
+          '<path d="M56.6 53.5 Q60 51.5 63.4 53.5 M43.4 53 L39 51.5 M76.6 53 L81 51.5" stroke="' + frame + '" stroke-width="1.4" fill="none"/>';
+      case 'square':
+        return '<g fill="#ffffff" fill-opacity="0.12" stroke="' + frame + '" stroke-width="2">' +
+          '<rect x="42.5" y="48.5" width="15" height="11" rx="2.5"/><rect x="62.5" y="48.5" width="15" height="11" rx="2.5"/></g>' +
+          '<path d="M57.5 53 L62.5 53 M42.5 52 L39 51 M77.5 52 L81 51" stroke="' + frame + '" stroke-width="1.8" fill="none"/>';
+      case 'aviators':
+        return '<g fill="#2a2f36" fill-opacity="0.88" stroke="#b8963c" stroke-width="1.2">' +
+          '<path d="M42 50 L57.5 50 Q58 58 52 61 Q43 61 42 50Z"/><path d="M62.5 50 L78 50 Q77 61 68 61 Q62 58 62.5 50Z"/></g>' +
+          '<path d="M57.5 50.5 Q60 49 62.5 50.5 M42 50.5 L39 50 M78 50.5 L81 50" stroke="#b8963c" stroke-width="1.2" fill="none"/>' +
+          '<path d="M45 52 L49 52" stroke="#ffffff" stroke-width="1" opacity="0.5"/>';
+      case 'goggles':
+        return '<path d="M36 52 L84 52" stroke="#3a3f46" stroke-width="4"/>' +
+          '<g fill="#bfe6ff" fill-opacity="0.55" stroke="#3a3f46" stroke-width="2.2">' +
+          '<rect x="41" y="47" width="17" height="13" rx="5"/><rect x="62" y="47" width="17" height="13" rx="5"/></g>';
+      default:
+        return '';
+    }
+  }
+
   function mouthSvg(face, skin) {
     var lip = shade(skin, -0.28);
     switch (face) {
@@ -163,6 +193,23 @@
     }
   }
 
+  // An object as the avatar: the emoji is the head, with the same eyes,
+  // mouth, hair, glasses and hat placed on top. Silly on purpose.
+  function objectBody(a, id) {
+    var obj = ITEM_BY_ID[a.body];
+    // Hair and hats are drawn for a head about 40 wide; stretch them to fit.
+    var fit = function (inner) { return '<g transform="translate(60 44) scale(1.3 1.15) translate(-60 -44)">' + inner + '</g>'; };
+    return fit(hairBack(a.hair, a.hairColor, id)) +
+      '<text x="60" y="68" text-anchor="middle" dominant-baseline="central" font-size="74">' + obj.emoji + '</text>' +
+      '<g transform="translate(60 62) scale(1.15) translate(-60 -60)">' +
+        browSvg(a.face, a.hairColor) +
+        eyesSvg(a.face, a.eyes) +
+        mouthSvg(a.face, '#b0564a') +
+        glassesSvg(a.glasses) +
+      '</g>' +
+      fit(hairFront(a.hair === 'none' ? 'object' : a.hair, a.hairColor, id) + hatSvg(a.hat));
+  }
+
   var uid = 0;
 
   // The background comes from the page's category tokens so it follows the theme.
@@ -174,7 +221,7 @@
     var item = ITEM_BY_ID[a.item];
     var name = label ? String(label).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') : '';
     return '<svg class="avatar" data-cat="' + a.bg + '" width="' + s + '" height="' + s + '" viewBox="0 0 120 120" role="img" aria-label="' +
-      (name ? name + '\'s avatar' : 'Avatar') + (item && item.emoji ? ', holding a ' + item.name.toLowerCase() : '') + '">' +
+      (name ? name + '\'s avatar' : 'Avatar') + (a.body !== 'person' ? ', a ' + ITEM_BY_ID[a.body].name.toLowerCase() + ' with a face' : '') + (item && item.emoji ? ', holding a ' + item.name.toLowerCase() : '') + '">' +
       '<defs>' +
         '<clipPath id="' + id + '-clip"><circle cx="60" cy="60" r="60"/></clipPath>' +
         '<radialGradient id="' + id + '-face" cx="45%" cy="40%" r="65%"><stop offset="0" stop-color="' + shade(skin, 0.1) + '"/><stop offset="0.7" stop-color="' + skin + '"/><stop offset="1" stop-color="' + shade(skin, -0.18) + '"/></radialGradient>' +
@@ -185,6 +232,7 @@
       '<g clip-path="url(#' + id + '-clip)">' +
         '<circle cx="60" cy="60" r="60" class="avatar-bg"/>' +
         '<circle cx="60" cy="60" r="60" fill="url(#' + id + '-bg)"/>' +
+        (a.body !== 'person' ? objectBody(a, id) :
         hairBack(a.hair, a.hairColor, id) +
         // neck and shoulders
         '<path d="M52 72 L52 90 Q60 95 68 90 L68 72Z" fill="' + shade(skin, -0.12) + '"/>' +
@@ -208,7 +256,8 @@
         '<ellipse cx="60" cy="63.2" rx="3.2" ry="1.6" fill="' + shade(skin, 0.14) + '" opacity="0.4"/>' +
         mouthSvg(a.face, skin) +
         hairFront(a.hair, a.hairColor, id) +
-        hatSvg(a.hat) +
+        glassesSvg(a.glasses) +
+        hatSvg(a.hat)) +
       '</g>' +
       (item && item.emoji
         ? '<circle cx="98" cy="98" r="18" class="avatar-item-bg"/><text x="98" y="99" text-anchor="middle" dominant-baseline="central" font-size="21">' + item.emoji + '</text>'
@@ -217,6 +266,7 @@
   }
 
   window.TriviaAvatar = {
+    ORDER: ['body', 'skin', 'eyes', 'hair', 'hairColor', 'face', 'glasses', 'hat', 'shirt', 'bg', 'item'],
     OPTIONS: OPTIONS, LABELS: LABELS, DEFAULT: DEFAULT, ITEMS: ITEM_BY_ID,
     normalize: normalize, forName: forName, svg: svg
   };
