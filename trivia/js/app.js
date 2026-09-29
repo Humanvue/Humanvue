@@ -56,6 +56,42 @@
 
   var timerHandle = null;
 
+  // ---------- sharing ----------
+
+  var APP_URL = 'https://humanvue.github.io/Humanvue/';
+
+  // Opens the phone's share sheet where it exists, otherwise copies the text.
+  // Resolves 'shared', 'copied' or 'failed'.
+  function shareOrCopy(text, url) {
+    if (navigator.share) {
+      return navigator.share({ title: 'Squad Trivia', text: text, url: url })
+        .then(function () { return 'shared'; }, function (e) {
+          return e && e.name === 'AbortError' ? 'cancelled' : copyText(text + (url ? ' ' + url : ''));
+        });
+    }
+    return copyText(text + (url ? ' ' + url : ''));
+  }
+
+  function copyText(text) {
+    try {
+      return navigator.clipboard.writeText(text).then(function () { return 'copied'; }, function () { return 'failed'; });
+    } catch (e) {
+      return Promise.resolve('failed');
+    }
+  }
+
+  function qrSvg(text) {
+    if (!window.qrcode) return '';
+    var qr = window.qrcode(0, 'M');
+    qr.addData(text);
+    qr.make();
+    return qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+  }
+
+  function joinUrl(code) {
+    return APP_URL + '?join=' + encodeURIComponent(code);
+  }
+
   // ---------- theme (kept per device) ----------
 
   var THEME_KEY = 'trivia.theme.v1';
@@ -128,6 +164,7 @@
 
   function go(screen) {
     stopTimer();
+    state.inviteNote = '';
     if (screen !== 'live' && state.live) liveReset();
     state.screen = screen;
     state.quitArmed = false;
@@ -464,7 +501,8 @@
   function shareBlock(result) {
     var text = Daily.shareText(result);
     return '<pre class="share" id="share-text">' + esc(text) + '</pre>' +
-      '<button class="btn-primary" data-action="copy-share">' + (state.copied ? 'Copied. Paste it in the group chat' : 'Copy result for the group chat') + '</button>';
+      '<button class="btn-primary" data-action="copy-share">' + (state.copied ? 'Copied. Paste it in the group chat' : 'Copy result for the group chat') + '</button>' +
+      (navigator.share ? '<button data-action="share-result">Share result…</button>' : '');
   }
 
   function viewHome() {
@@ -548,13 +586,14 @@
     }
     var body;
     if (!Store.user()) {
-      body = signInButton('Sign in with Google to play live');
+      body = (state.pendingJoin ? '<p class="notice">Sign in to join game <strong>' + esc(state.pendingJoin) + '</strong>.</p>' : '') +
+        signInButton('Sign in with Google to play live');
     } else {
       body = '<p class="muted">Host a game and share the 4-letter code, or join a friend\'s game. ' +
           LIVE_QUESTIONS + ' questions from the categories picked under Pass &amp; Play, ' + (state.setup.timer || 20) + ' seconds each.</p>' +
         '<button class="btn-primary" data-action="live-host"' + (state.liveBusy ? ' disabled' : '') + '>Host a live game</button>' +
         '<form class="field-row" data-form="live-join">' +
-          '<input type="text" id="live-code" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="Game code" aria-label="Game code">' +
+          '<input type="text" id="live-code" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="Game code" aria-label="Game code" value="' + esc(state.pendingJoin || '') + '">' +
           '<button type="submit"' + (state.liveBusy ? ' disabled' : '') + '>Join</button>' +
         '</form>';
     }
@@ -972,6 +1011,25 @@
       '</section>';
   }
 
+  function viewShare() {
+    return topbar('<button class="btn-small" data-action="home">Home</button>') +
+      '<section class="card share-card">' +
+        '<h1>Invite friends</h1>' +
+        '<p class="muted">Send the link, or have them scan this code with their phone camera. They sign in with Google and they\'re in.</p>' +
+        '<div class="qr" aria-label="QR code for ' + APP_URL + '">' + qrSvg(APP_URL) + '</div>' +
+        '<p class="share-url">' + APP_URL.replace('https://', '') + '</p>' +
+        '<div class="stack">' +
+          '<button class="btn-primary" data-action="share-link">' + (state.inviteNote || (navigator.share ? 'Share Squad Trivia…' : 'Copy invite link')) + '</button>' +
+        '</div>' +
+      '</section>' +
+      '<section class="card"><h2>Put it on your home screen</h2>' +
+        '<p class="muted">It opens full screen like a regular app.</p>' +
+        '<ul class="rule-list">' +
+          '<li><strong>iPhone:</strong> open the link in Safari, tap the Share button, then Add to Home Screen.</li>' +
+          '<li><strong>Android:</strong> open the link in Chrome, tap the ⋮ menu, then Add to Home screen or Install app.</li>' +
+        '</ul></section>';
+  }
+
   // ---------- players, avatars and trash talk ----------
 
   function myAvatar() {
@@ -997,6 +1055,7 @@
       '<button data-action="players">Players</button>' +
       '<button data-action="talk">Trash talk' + (badge ? ' <span class="badge">' + badge + '</span>' : '') + '</button>' +
       '<button data-action="trophies">Trophy case</button>' +
+      '<button data-action="share-app">Invite friends</button>' +
       '<button class="nav-avatar" data-action="avatar">' + Avatar.svg(myAvatar(), 28, state.profileName) + 'My avatar</button>' +
       '</nav>';
   }
@@ -1265,6 +1324,7 @@
 
   function liveFail(e) {
     state.liveBusy = false;
+    state.pendingJoin = null;
     state.liveError = (e && e.message) || 'Could not reach the game. Check your connection and try again.';
     render();
   }
@@ -1293,6 +1353,7 @@
 
   function enterLive(code) {
     state.liveBusy = false;
+    state.pendingJoin = null;
     go('live');
     state.live = { code: code, snap: null, seenIndex: -1, deadline: 0, picks: {}, revealing: -1, error: '' };
     liveStop = Store.live.watch(code, onLive, function () {
@@ -1445,7 +1506,9 @@
         '<section class="card handoff">' +
           '<p class="label">Game code</p>' +
           '<p class="who code">' + esc(L.code) + '</p>' +
-          '<p class="muted">Friends open Squad Trivia, sign in, and enter this code under Live Game.</p>' +
+          '<p class="muted">Friends open Squad Trivia, sign in, and enter this code under Live Game. Or send them the invite link.</p>' +
+          '<div class="row"><button data-action="invite-game" data-code="' + esc(L.code) + '">' + (state.inviteNote || 'Invite to this game') + '</button></div>' +
+          '<div class="qr qr-small" aria-label="QR code that opens this game">' + qrSvg(joinUrl(L.code)) + '</div>' +
           (isHost
             ? '<button class="btn-primary" data-action="live-next">Start with ' + L.snap.players.length + ' player' + (L.snap.players.length === 1 ? '' : 's') + '</button>'
             : '<p class="progress">Waiting for ' + esc(g.hostName) + ' to start</p>') + err +
@@ -1529,6 +1592,7 @@
     players: viewPlayers,
     player: viewPlayer,
     talk: viewTalk,
+    share: viewShare,
     'daily-result': viewDailyResult,
     setup: viewSetup,
     handoff: viewHandoff,
@@ -1619,6 +1683,29 @@
       case 'board':
         go('board');
         break;
+      case 'share-app':
+        state.inviteNote = '';
+        go('share');
+        break;
+      case 'share-link':
+        shareOrCopy('Come play Squad Trivia with me: daily challenge, live games and trash talk.', APP_URL).then(function (r) {
+          state.inviteNote = r === 'copied' ? 'Link copied. Paste it to your friends' : r === 'failed' ? 'Copy this link: ' + APP_URL : '';
+          render();
+        });
+        break;
+      case 'invite-game': {
+        var code = el.getAttribute('data-code');
+        shareOrCopy('Join my Squad Trivia game. Code ' + code + '.', joinUrl(code)).then(function (r) {
+          state.inviteNote = r === 'copied' ? 'Invite link copied' : r === 'failed' ? 'Code: ' + code : '';
+          render();
+        });
+        break;
+      }
+      case 'share-result': {
+        var res = todaysDaily();
+        if (res) shareOrCopy(Daily.shareText(res), APP_URL);
+        break;
+      }
       case 'theme-toggle':
         state.themeOpen = !state.themeOpen;
         render();
@@ -1894,11 +1981,24 @@
     state.renaming = false;
     state.players = null;
     watchBoard();
-    loadShared().then(render, render);
+    loadShared().then(render, render).then(tryPendingJoin);
   });
 
+  // Invite links look like ...?join=ABCD. Remember the code, tidy the address bar,
+  // and join as soon as the player is signed in.
+  (function () {
+    var m = /[?&]join=([A-Za-z]{4})/.exec(window.location.search);
+    if (!m) return;
+    state.pendingJoin = m[1].toUpperCase();
+    try { window.history.replaceState(null, '', window.location.pathname); } catch (e) { /* keep the query */ }
+  })();
+
+  function tryPendingJoin() {
+    if (state.pendingJoin && Store.live && Store.user() && !state.live) joinLive(state.pendingJoin);
+  }
+
   Promise.all([
-    Store.ready.then(loadShared),
+    Store.ready.then(loadShared).then(tryPendingJoin),
     loadHistory(),
     Store.getLastSetup().then(function (saved) {
       if (saved && Array.isArray(saved.players)) {

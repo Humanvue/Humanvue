@@ -736,3 +736,18 @@ a { color: var(--brass); }
 .msg.mentions-me { background: color-mix(in srgb, var(--brass) 14%, var(--surface)); }
 .mention { font-weight: 700; color: var(--brass); }
 .mention.me { background: var(--brass); color: var(--brass-ink); border-radius: 4px; padding: 0 3px; }
+
+/* Sharing */
+.share-card { align-items: center; text-align: center; }
+.qr {
+  background: #ffffff;
+  padding: 10px;
+  border-radius: 12px;
+  width: min(240px, 100%);
+  line-height: 0;
+  border: 1px solid var(--line);
+}
+.qr svg { width: 100%; height: auto; }
+.qr-small { width: min(160px, 100%); }
+.share-url { font-family: var(--mono); font-weight: 700; overflow-wrap: anywhere; }
+.share-card .stack { width: 100%; }

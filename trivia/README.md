@@ -15,6 +15,8 @@ Pass-and-play trivia for a group of friends on one phone or laptop.
 - Leaderboard: today's Daily Challenge results and all-time Daily Challenge points.
 - Add your own questions in the **Question bank**; they join the mix in their category.
 - Recent games are kept as a simple history.
+- Sharing: **Invite friends** on the home screen opens the phone's share sheet (or copies the link) and shows a QR code to scan. A live game lobby has its own invite link and QR that drop friends straight into that game after they sign in (`?join=CODE`). Daily Challenge results can go out through the share sheet too.
+- Installable: `manifest.webmanifest` and `icons/` let players add it to their home screen (Safari: Share, Add to Home Screen; Chrome: menu, Add to Home screen).
 - **Daily Challenge:** everyone gets the same 10 questions each day (3 rotating categories), plays once,
   and copies a Wordle-style result into the group chat. It needs no server: the date seeds the pick
   (`js/daily.js`), so every copy of the app on the same version agrees. Custom questions are left out.
@@ -88,3 +90,5 @@ without changing the game flow in `js/app.js`.
 - `js/cloud.js`, `js/firebase-config.js` – Firebase sign-in, shared scores and live games
 - `firestore.rules` – who can read and write what online
 - `js/app.js` – game screens and rules
+- `js/vendor/qrcode.js` – QR code generator (qrcode-generator 1.4.4, MIT, Kazuhiko Arase)
+- `manifest.webmanifest`, `icons/` – home-screen install name and icons
