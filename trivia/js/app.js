@@ -1,10 +1,12 @@
-// Squad Trivia: pass-and-play trivia for one phone or laptop.
-// Screens: setup -> (handoff -> question -> reveal) x N -> results.
+// Squad Trivia: trivia for a group of friends.
+// Modes: Pass & Play (one phone, setup -> handoff/question/reveal -> results)
+// and Daily Challenge (same 10 questions for everyone each day, see daily.js).
 // All saving goes through window.TriviaStore (see store.js).
 (function () {
   var CATEGORIES = window.TRIVIA_CATEGORIES;
   var BUILT_IN = window.TRIVIA_QUESTIONS;
   var Store = window.TriviaStore;
+  var Daily = window.TriviaDaily;
 
   var BASE_POINTS = 100;
   var SPEED_BONUS = 50;
@@ -14,7 +16,7 @@
   var app = document.getElementById('app');
 
   var state = {
-    screen: 'setup',
+    screen: 'home',
     setup: {
       players: ['Big Poppa', 'Guest'],
       categories: CATEGORIES.map(function (c) { return c.id; }),
@@ -23,6 +25,8 @@
     },
     custom: [],
     history: [],
+    dailyResults: {},
+    copied: false,
     game: null,
     quitArmed: false,
     clearArmed: false,
@@ -111,23 +115,61 @@
     Store.saveLastSetup(s);
 
     var total = perPlayer * s.players.length;
-    state.game = {
-      players: s.players.map(function (name, i) {
+    state.game = newGame('party', s.players, pool.slice(0, total).map(function (q) {
+      return { q: q, options: shuffle([q.answer].concat(q.wrong)) };
+    }), s.timer);
+    state.game.perPlayer = perPlayer;
+    state.game.shortened = perPlayer < s.perPlayer;
+    beginTurn();
+  }
+
+  function newGame(mode, names, questions, timer) {
+    return {
+      mode: mode,
+      players: names.map(function (name, i) {
         return { name: name, order: i, score: 0, correct: 0, answered: 0, streak: 0, bestStreak: 0 };
       }),
-      questions: pool.slice(0, total).map(function (q) {
-        return { q: q, options: shuffle([q.answer].concat(q.wrong)) };
-      }),
-      perPlayer: perPlayer,
-      shortened: perPlayer < s.perPlayer,
-      timer: s.timer,
+      questions: questions,
+      perPlayer: questions.length,
+      shortened: false,
+      timer: timer,
       index: 0,
       picked: null,
       points: 0,
       deadline: 0,
+      pattern: [],
       saved: false
     };
-    beginTurn();
+  }
+
+  function todaysDaily() {
+    return state.dailyResults[Daily.today()] || null;
+  }
+
+  function startDaily() {
+    if (todaysDaily()) return go('home');
+    var plan = Daily.build(Daily.today());
+    state.game = newGame('daily', ['You'], plan.questions, plan.timer);
+    state.game.daily = plan;
+    // Saved before the first question so quitting or reloading can't earn a replay.
+    saveDailyProgress();
+    showQuestion();
+  }
+
+  function saveDailyProgress(done) {
+    var g = state.game;
+    var p = g.players[0];
+    var result = {
+      date: g.daily.date,
+      number: g.daily.number,
+      score: p.score,
+      correct: p.correct,
+      total: g.questions.length,
+      pattern: g.questions.map(function (_, i) { return !!g.pattern[i]; }),
+      finished: !!done
+    };
+    state.dailyResults[result.date] = result;
+    return Store.saveDailyResult(result);
   }
 
   function currentPlayer() {
@@ -190,6 +232,8 @@
     } else {
       player.streak = 0;
     }
+    g.pattern[g.index] = right;
+    if (g.mode === 'daily') saveDailyProgress();
     go('reveal');
   }
 
@@ -202,6 +246,11 @@
 
   function finish() {
     var g = state.game;
+    if (g.mode === 'daily') {
+      saveDailyProgress(true);
+      state.copied = false;
+      return go('daily-result');
+    }
     go('results');
     if (!g.saved) {
       g.saved = true;
@@ -217,6 +266,10 @@
 
   function loadHistory() {
     return Store.listGames(5).then(function (games) { state.history = games; });
+  }
+
+  function loadDaily() {
+    return Store.listDailyResults().then(function (all) { state.dailyResults = all; });
   }
 
   function loadCustom() {
@@ -251,6 +304,74 @@
   function quitButton() {
     return '<button class="btn-ghost btn-small' + (state.quitArmed ? ' btn-danger' : '') + '" data-action="quit">' +
       (state.quitArmed ? 'Tap again to quit' : 'Quit game') + '</button>';
+  }
+
+  function categoryBadges(ids) {
+    return '<div class="chips">' + ids.map(function (id) {
+      return '<span class="cat-badge" data-cat="' + id + '">' + esc(catName(id)) + '</span>';
+    }).join('') + '</div>';
+  }
+
+  function dailyStreak() {
+    return Daily.streak(Object.keys(state.dailyResults), Daily.today());
+  }
+
+  function shareBlock(result) {
+    var text = Daily.shareText(result);
+    return '<pre class="share" id="share-text">' + esc(text) + '</pre>' +
+      '<button class="btn-primary" data-action="copy-share">' + (state.copied ? 'Copied. Paste it in the group chat' : 'Copy result for the group chat') + '</button>';
+  }
+
+  function viewHome() {
+    var date = Daily.today();
+    var plan = Daily.build(date);
+    var done = todaysDaily();
+    var streak = dailyStreak();
+
+    var daily = done
+      ? '<p class="muted">You played today. ' + (done.finished ? '' : 'Unanswered questions count as misses. ') +
+          'A new challenge unlocks at midnight.</p>' +
+        '<div class="stat-grid">' +
+          '<div class="stat"><div class="v">' + done.correct + '/' + done.total + '</div><div class="k">correct</div></div>' +
+          '<div class="stat"><div class="v">' + done.score + '</div><div class="k">points</div></div>' +
+          '<div class="stat"><div class="v">' + streak + '</div><div class="k">day streak</div></div>' +
+        '</div>' + shareBlock(done)
+      : '<p class="muted">Everyone gets the same 10 questions today. Play once, whenever you want, then post your score in the group chat.</p>' +
+        '<button class="btn-primary" data-action="daily">Play today\'s challenge</button>' +
+        (streak ? '<p class="small muted">Current streak: ' + streak + ' day' + (streak === 1 ? '' : 's') + '</p>' : '');
+
+    return topbar('<button class="btn-small" data-action="bank">Question bank</button>') +
+      '<section class="card">' +
+        '<div class="q-meta"><h2>Daily Challenge</h2><span class="progress">#' + plan.number + ' · ' + esc(date) + '</span></div>' +
+        categoryBadges(plan.categories) + daily +
+      '</section>' +
+      '<section class="card">' +
+        '<h2>Pass &amp; Play</h2>' +
+        '<p class="muted">Everyone in the same room, one phone passed around. Pick the players, categories and timer.</p>' +
+        '<button data-action="setup">Set up a game</button>' +
+      '</section>' +
+      '<section class="card mode-soon">' +
+        '<div class="q-meta"><h2>Live Game</h2><span class="soon">Coming soon</span></div>' +
+        '<p class="muted">Everyone answers on their own phone at the same moment, from anywhere, with a shared leaderboard. This turns on once the free hosting and sign-in are set up.</p>' +
+      '</section>' +
+      '<p class="footer-note">Scores and your own questions are saved on this device only.</p>';
+  }
+
+  function viewDailyResult() {
+    var result = todaysDaily();
+    return topbar('') +
+      '<section class="card winner">' +
+        '<p class="crown">Daily Challenge #' + result.number + '</p>' +
+        '<h1>' + result.correct + ' out of ' + result.total + '</h1>' +
+        '<div class="stat-grid" style="width:100%">' +
+          '<div class="stat"><div class="v">' + result.score + '</div><div class="k">points</div></div>' +
+          '<div class="stat"><div class="v">' + state.game.players[0].bestStreak + '</div><div class="k">best run</div></div>' +
+          '<div class="stat"><div class="v">' + dailyStreak() + '</div><div class="k">day streak</div></div>' +
+        '</div>' +
+      '</section>' +
+      '<section class="card">' + shareBlock(result) +
+        '<button data-action="home">Back to home</button>' +
+      '</section>';
   }
 
   function viewSetup() {
@@ -289,7 +410,7 @@
         (state.clearArmed ? 'Tap again to clear' : 'Clear history') + '</button>'
       : '<p class="small muted">Finished games show up here.</p>';
 
-    return topbar('<button class="btn-small" data-action="bank">Question bank</button>') +
+    return topbar('<button class="btn-small" data-action="home">Home</button>') +
       '<section class="card">' +
         '<h1>Who\'s playing tonight?</h1>' +
         '<p class="muted">Pass one phone around. Everyone answers their own questions, fastest right answers score the most.</p>' +
@@ -418,7 +539,7 @@
       '</section>' +
       '<section class="card"><h2>Final standings</h2>' + scoreboard(null) +
         '<div class="stack"><button class="btn-primary" data-action="rematch">Rematch</button>' +
-        '<button data-action="home">Change players or categories</button></div>' +
+        '<button data-action="setup">Change players or categories</button></div>' +
       '</section>';
   }
 
@@ -441,7 +562,7 @@
       return '<span class="chip" data-cat="' + c.id + '" style="padding-right:12px"><span class="pill-dot"></span>' + esc(c.name) + ' · ' + countFor(c.id) + '</span>';
     }).join('');
 
-    return topbar('<button class="btn-small" data-action="home">Back to setup</button>') +
+    return topbar('<button class="btn-small" data-action="home">Home</button>') +
       '<section class="card">' +
         '<h1>Question bank</h1>' +
         '<div class="chips">' + counts + '</div>' +
@@ -462,6 +583,8 @@
   }
 
   var VIEWS = {
+    home: viewHome,
+    'daily-result': viewDailyResult,
     setup: viewSetup,
     handoff: viewHandoff,
     question: viewQuestion,
@@ -527,7 +650,7 @@
         next();
         break;
       case 'quit':
-        if (state.quitArmed) { state.game = null; go('setup'); }
+        if (state.quitArmed) { state.game = null; go('home'); }
         else { state.quitArmed = true; el.textContent = 'Tap again to quit'; el.classList.add('btn-danger'); }
         break;
       case 'rematch':
@@ -535,8 +658,32 @@
         break;
       case 'home':
         state.bankError = '';
+        go('home');
+        break;
+      case 'setup':
         go('setup');
         break;
+      case 'daily':
+        startDaily();
+        break;
+      case 'copy-share': {
+        var text = document.getElementById('share-text').textContent;
+        var done = function () { state.copied = true; render(); };
+        var fallback = function () {
+          var range = document.createRange();
+          range.selectNodeContents(document.getElementById('share-text'));
+          var sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          el.textContent = 'Text selected. Copy it from here';
+        };
+        try {
+          navigator.clipboard.writeText(text).then(done, fallback);
+        } catch (err) {
+          fallback();
+        }
+        break;
+      }
       case 'bank':
         go('bank');
         break;
@@ -616,6 +763,7 @@
   Promise.all([
     loadCustom(),
     loadHistory(),
+    loadDaily(),
     Store.getLastSetup().then(function (saved) {
       if (saved && Array.isArray(saved.players)) {
         state.setup.players = saved.players.slice(0, MAX_PLAYERS);

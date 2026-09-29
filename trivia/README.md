@@ -6,6 +6,9 @@ Pass-and-play trivia for a group of friends on one phone or laptop.
 - 100 points for a right answer plus up to 50 for speed.
 - Add your own questions in the **Question bank**; they join the mix in their category.
 - Recent games are kept as a simple history.
+- **Daily Challenge:** everyone gets the same 10 questions each day (3 rotating categories), plays once,
+  and copies a Wordle-style result into the group chat. It needs no server: the date seeds the pick
+  (`js/daily.js`), so every copy of the app on the same version agrees. Custom questions are left out.
 
 ## Run it
 
@@ -20,6 +23,11 @@ To make the single-file version used for the shareable Artifact:
 ```sh
 sh tools/build-single-file.sh > squad-trivia.html
 ```
+
+## Hosting
+
+`.github/workflows/trivia-pages.yml` publishes this folder to GitHub Pages on every push.
+Turn it on once under **Settings > Pages > Source: GitHub Actions** (Pages on the free plan needs a public repo).
 
 ## Where data lives
 
@@ -46,5 +54,6 @@ without changing the game flow in `js/app.js`.
 - `index.html` – page shell
 - `styles.css` – look and feel, light and dark themes
 - `js/questions.js` – built-in categories and questions
+- `js/daily.js` – Daily Challenge question pick, share text and streaks
 - `js/store.js` – storage layer (swap this for a database)
 - `js/app.js` – game screens and rules

@@ -6,7 +6,8 @@
   var KEYS = {
     custom: 'trivia.customQuestions.v1',
     history: 'trivia.history.v1',
-    lastSetup: 'trivia.lastSetup.v1'
+    lastSetup: 'trivia.lastSetup.v1',
+    daily: 'trivia.daily.v1'
   };
 
   // Browser storage can be missing or blocked (private windows, previews),
@@ -72,6 +73,18 @@
     clearGames: function () {
       write(KEYS.history, []);
       return Promise.resolve();
+    },
+
+    // Daily Challenge results, keyed by date (YYYY-MM-DD).
+    listDailyResults: function () {
+      return Promise.resolve(read(KEYS.daily, {}));
+    },
+
+    saveDailyResult: function (result) {
+      var all = read(KEYS.daily, {});
+      all[result.date] = result;
+      write(KEYS.daily, all);
+      return Promise.resolve(result);
     },
 
     getLastSetup: function () {
