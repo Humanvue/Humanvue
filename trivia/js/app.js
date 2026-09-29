@@ -30,6 +30,7 @@
     dailyResults: [],
     profileName: '',
     boardTab: 'today',
+    crown: null,
     tallies: {},
     trophyKey: null,
     theme: readTheme(),
@@ -427,7 +428,7 @@
   }
 
   function loadDaily() {
-    return Store.listDailyResults().then(function (all) { state.dailyResults = all; });
+    return Store.listDailyResults().then(function (all) { state.dailyResults = all; state.crown = crownHolder(); });
   }
 
   function loadCustom() {
@@ -615,11 +616,12 @@
       '</ul></section>';
   }
 
-  function aggregate() {
+  function aggregate(from, to) {
     var byName = {};
     state.dailyResults.forEach(function (r) {
+      if (from && (r.date < from || r.date > to)) return;
       var key = playerKey(r);
-      var row = byName[key] || (byName[key] = { name: r.player, mine: isMe(r), points: 0, days: 0, correct: 0, total: 0, best: 0 });
+      var row = byName[key] || (byName[key] = { key: key, name: r.player, mine: isMe(r), points: 0, days: 0, correct: 0, total: 0, best: 0 });
       row.points += r.score;
       row.days += 1;
       row.correct += r.correct;
@@ -628,6 +630,59 @@
     });
     return Object.keys(byName).map(function (k) { return byName[k]; })
       .sort(function (a, b) { return b.points - a.points || b.correct - a.correct; });
+  }
+
+  // ---------- weekly crown ----------
+  // Weeks run Monday to Sunday. Whoever scored the most Daily Challenge
+  // points last week wears the crown on their avatar all this week.
+
+  function addDays(date, n) {
+    var p = date.split('-').map(Number);
+    return Daily.today(new Date(p[0], p[1] - 1, p[2] + n));
+  }
+
+  function weekStart(date) {
+    var p = date.split('-').map(Number);
+    var day = new Date(p[0], p[1] - 1, p[2]).getDay();
+    return addDays(date, -((day + 6) % 7));
+  }
+
+  function shortDate(date) {
+    var p = date.split('-').map(Number);
+    return new Date(p[0], p[1] - 1, p[2]).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  function crownHolder() {
+    var from = addDays(weekStart(Daily.today()), -7);
+    var top = aggregate(from, addDays(from, 6))[0];
+    return top ? Object.assign({ from: from }, top) : null;
+  }
+
+  // Players, results and board authors all carry a uid online or a name on a device.
+  function hasCrown(p) {
+    var c = state.crown;
+    if (!c || !p) return false;
+    var keys = [p.uid, p.key, p.name && p.name.trim().toLowerCase()].filter(Boolean)
+      .map(function (k) { return String(k).replace(/^(uid|name):/, ''); });
+    return keys.indexOf(c.key) !== -1;
+  }
+
+  function crownOpts(p) {
+    return { crown: hasCrown(p) };
+  }
+
+  function myCrownOpts() {
+    var u = Store.user();
+    return crownOpts(u ? { uid: u.uid } : { name: state.profileName || '' });
+  }
+
+  function crownNote() {
+    var c = state.crown;
+    if (!c) return '';
+    var p = (state.players || []).filter(hasCrown)[0];
+    return '<div class="notice crown-note">' + Avatar.svg(p ? avatarFor(p) : Avatar.forName(c.name), 40, c.name, { crown: true }) +
+      '<span><strong>' + esc(c.name) + '</strong> wears the crown this week for scoring ' + c.points +
+      ' in the week of ' + shortDate(c.from) + '.</span></div>';
   }
 
   function viewBoard() {
@@ -646,6 +701,18 @@
               '<span class="score">' + r.score + '</span></div>';
           }).join('') + '</div>'
         : '<p class="muted">Nobody has played today\'s challenge yet.</p>';
+    } else if (tab === 'week') {
+      var from = weekStart(date);
+      var week = aggregate(from, addDays(from, 6));
+      body = (week.length
+        ? '<div class="board">' + week.map(function (r, i) {
+            return '<div class="board-row' + (r.mine ? ' current' : '') + '">' +
+              '<span class="rank">' + (i === 0 ? '\uD83D\uDC51' : i + 1) + '</span>' +
+              '<span class="name">' + esc(r.name) + ' <span class="sub">' + r.days + ' of 7 days · best ' + r.best + '</span></span>' +
+              '<span class="score">' + r.points + '</span></div>';
+          }).join('') + '</div>'
+        : '<p class="muted">Nobody has played this week yet.</p>') +
+        '<p class="small muted">Week of ' + shortDate(from) + '. The leader on Sunday night takes the crown for next week.</p>';
     } else {
       var all = aggregate();
       body = all.length
@@ -663,8 +730,9 @@
         '<div class="q-meta"><h1>Leaderboard</h1><span class="progress">Daily #' + Daily.number(date) + '</span></div>' +
         '<div class="seg" role="tablist">' +
           '<button data-action="board-tab" data-value="today" aria-pressed="' + (tab === 'today') + '">Today</button>' +
+          '<button data-action="board-tab" data-value="week" aria-pressed="' + (tab === 'week') + '">This week</button>' +
           '<button data-action="board-tab" data-value="all" aria-pressed="' + (tab === 'all') + '">All time</button>' +
-        '</div>' + body +
+        '</div>' + crownNote() + body +
         '<p class="small muted">Daily Challenge points only, since everyone gets the same questions. ' +
           (Store.cloud && Store.user() ? 'Everyone signed in shows up here.' : 'This lists people who played on this device.') + '</p>' +
       '</section>';
@@ -1056,7 +1124,7 @@
       '<button data-action="talk">Trash talk' + (badge ? ' <span class="badge">' + badge + '</span>' : '') + '</button>' +
       '<button data-action="trophies">Trophy case</button>' +
       '<button data-action="share-app">Invite friends</button>' +
-      '<button class="nav-avatar" data-action="avatar">' + Avatar.svg(myAvatar(), 28, state.profileName) + 'My avatar</button>' +
+      '<button class="nav-avatar" data-action="avatar">' + Avatar.svg(myAvatar(), 28, state.profileName, myCrownOpts()) + 'My avatar</button>' +
       '</nav>';
   }
 
@@ -1116,7 +1184,7 @@
     return topbar('<button class="btn-small" data-action="home">Home</button>') +
       '<section class="card avatar-card">' +
         '<h1>My avatar</h1>' +
-        '<div class="avatar-preview">' + Avatar.svg(a, 132, state.profileName) +
+        '<div class="avatar-preview">' + Avatar.svg(a, 132, state.profileName, myCrownOpts()) +
           '<div class="stack"><p class="trophy-item">' + esc(state.profileName || 'Your name') + '</p>' + showcaseHtml(picks) + '</div></div>' +
         (needName ? '<div class="field"><label class="label" for="avatar-name">Your name</label>' +
           '<input type="text" id="avatar-name" maxlength="20" autocomplete="off" value="' + esc(state.profileName) + '"></div>' : '') +
@@ -1173,7 +1241,7 @@
             var t = playerTotals(p);
             var top = strengthRows(p)[0];
             return '<button class="player-row" data-action="player" data-key="' + esc(p.key) + '">' +
-              Avatar.svg(avatarFor(p), 48, p.name) +
+              Avatar.svg(avatarFor(p), 48, p.name, crownOpts(p)) +
               '<span class="main"><strong>' + esc(p.name) + '</strong>' +
                 '<span class="small muted">' + t.right + ' right · ' + t.trophies + ' trophies' +
                 (top && top.right ? ' · best at ' + esc(catName(top.cat)) : '') + '</span>' +
@@ -1191,7 +1259,7 @@
     var t = playerTotals(p);
     return topbar('<button class="btn-small" data-action="players">All players</button>') +
       '<section class="card">' +
-        '<div class="avatar-preview">' + Avatar.svg(avatarFor(p), 112, p.name) +
+        '<div class="avatar-preview">' + Avatar.svg(avatarFor(p), 112, p.name, crownOpts(p)) +
           '<div class="stack"><h1>' + esc(p.name) + '</h1>' + showcaseHtml(p.showcase) + '</div></div>' +
         '<div class="stat-grid">' +
           '<div class="stat"><div class="v">' + t.right + '</div><div class="k">right answers</div></div>' +
@@ -1245,7 +1313,7 @@
             var who = byUid[m.uid] || { name: m.name };
             var mine = m.uid === u.uid;
             return '<div class="msg' + (m.mentions.indexOf(u.uid) !== -1 && !mine ? ' mentions-me' : '') + '">' +
-              Avatar.svg(avatarFor(who), 36, m.name) +
+              Avatar.svg(avatarFor(who), 36, m.name, crownOpts(m.uid ? { uid: m.uid } : who)) +
               '<div class="main"><p class="msg-head"><strong>' + esc(m.name) + '</strong> <span class="small muted">' + timeAgo(m.at) + '</span>' +
               (mine ? ' <button class="btn-ghost btn-small" data-action="talk-delete" data-id="' + esc(m.id) + '">Delete</button>' : '') + '</p>' +
               '<p class="msg-text">' + withMentions(m.text) + '</p></div></div>';
@@ -1682,6 +1750,7 @@
         break;
       case 'board':
         go('board');
+        if (state.crown && !state.players) loadPlayers().then(render);
         break;
       case 'share-app':
         state.inviteNote = '';

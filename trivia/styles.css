@@ -686,6 +686,8 @@ a { color: var(--brass); }
 /* Avatars */
 .avatar { flex: none; display: block; overflow: visible; }
 .avatar-item-bg { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.avatar-crown-bg { fill: #f6d77a; stroke: #a8811f; stroke-width: 2; }
+.crown-note { display: flex; align-items: center; gap: 12px; }
 .item-grid { max-height: 260px; overflow-y: auto; padding: 2px; }
 .item-emoji { font-size: 1.15rem; line-height: 1; }
 .avatar-bg { fill: var(--cat, var(--brass)); }

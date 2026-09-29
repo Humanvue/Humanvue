@@ -2,7 +2,7 @@
 
 Pass-and-play trivia for a group of friends on one phone or laptop.
 
-- 2 to 8 players (or solo), 13 color-coded categories (108 questions), optional 15/20/30 second timer.
+- 2 to 8 players (or solo), 13 color-coded categories (758 questions, about 60 per category), optional 15/20/30 second timer.
 - Scoring: Easy 100, Medium 200, Hard 300, plus up to 25% for speed. Three right in a row
   scores x1.5, five or more x2. The category of the day scores x2 in every mode (`js/scoring.js`).
 - Category rewards: 5, 15, 30, 60 and 100 right answers in a category unlock five objects, each
@@ -12,7 +12,8 @@ Pass-and-play trivia for a group of friends on one phone or laptop.
 - Avatars: a shaded head-and-shoulders portrait you build (skin, eyes, hair, expression, headwear, shirt, background, glasses, and one of 55 objects to hold). You can also be one of those objects instead of a person, still with a face, hair, glasses and a hat and show off up to three unlocked rewards.
 - Players: everyone's avatar and trophies, plus a category-strength chart (right answers and accuracy per category).
 - Trash talk (online only): one public board for the whole group with @mentions. There are no private messages.
-- Leaderboard: today's Daily Challenge results and all-time Daily Challenge points.
+- Leaderboard: today's Daily Challenge results, this week's totals, and all-time Daily Challenge points.
+- Weekly crown: whoever scores the most Daily Challenge points Monday to Sunday wears a 👑 on their avatar all the next week.
 - Add your own questions in the **Question bank**; they join the mix in their category.
 - Recent games are kept as a simple history.
 - Sharing: **Invite friends** on the home screen opens the phone's share sheet (or copies the link) and shows a QR code to scan. A live game lobby has its own invite link and QR that drop friends straight into that game after they sign in (`?join=CODE`). Daily Challenge results can go out through the share sheet too.
