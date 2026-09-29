@@ -8,6 +8,10 @@ Pass-and-play trivia for a group of friends on one phone or laptop.
 - Category rewards: 5, 15, 30, 60 and 100 right answers in a category unlock five objects, each
   better than the last (Nursing & Health goes Penlight, Pulse Oximeter, Stethoscope, Crash Cart,
   Nightingale Lamp). See the ladders in `js/rewards.js` and your progress in the Trophy case.
+- Theme picker (top of every screen): match device, light or dark, plus five accent colors. Saved per device.
+- Avatars: build your own (skin, hair, expression, headwear, shirt, background) and show off up to three unlocked rewards.
+- Players: everyone's avatar and trophies, plus a category-strength chart (right answers and accuracy per category).
+- Trash talk (online only): one public board for the whole group with @mentions. There are no private messages.
 - Leaderboard: today's Daily Challenge results and all-time Daily Challenge points.
 - Add your own questions in the **Question bank**; they join the mix in their category.
 - Recent games are kept as a simple history.
@@ -78,6 +82,7 @@ without changing the game flow in `js/app.js`.
 - `js/questions.js` – built-in categories and questions
 - `js/scoring.js` – point values, streak multiplier, category-of-the-day bonus
 - `js/rewards.js` – category reward ladders and unlock thresholds
+- `js/avatar.js` – avatar options and the SVG drawing
 - `js/daily.js` – Daily Challenge question pick, share text and streaks
 - `js/store.js` – on-device storage (the default)
 - `js/cloud.js`, `js/firebase-config.js` – Firebase sign-in, shared scores and live games

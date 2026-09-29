@@ -7,11 +7,27 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function me() { return request.auth.uid; }
 
+    // Name, avatar, trophy showcase and category counts. Only you edit yours.
     match /users/{uid} {
       allow read: if signedIn();
       allow write: if signedIn() && uid == me()
         && request.resource.data.name is string
-        && request.resource.data.name.size() <= 20;
+        && request.resource.data.name.size() <= 20
+        && (!('showcase' in request.resource.data) || request.resource.data.showcase.size() <= 3);
+    }
+
+    // The public trash-talk board. Anyone signed in can read and post;
+    // you can delete only your own posts. There are no private messages.
+    match /board/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.uid == me()
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 280
+        && request.resource.data.mentions.size() <= 10;
+      allow delete: if signedIn() && resource.data.uid == me();
+      allow update: if false;
     }
 
     // One result per person per day. It can keep updating while the game is

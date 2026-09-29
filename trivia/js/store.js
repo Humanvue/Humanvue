@@ -9,7 +9,8 @@
     lastSetup: 'trivia.lastSetup.v1',
     daily: 'trivia.daily.v2',
     profile: 'trivia.profile.v1',
-    tallies: 'trivia.tallies.v1'
+    tallies: 'trivia.tallies.v1',
+    seen: 'trivia.seen.v1'
   };
 
   // Browser storage can be missing or blocked (private windows, previews),
@@ -43,6 +44,7 @@
     cloud: false,
     ready: Promise.resolve(),
     live: null,
+    board: null,
     user: function () { return null; },
     onAuth: function () {},
     signIn: function () { return Promise.reject(new Error('Sign-in needs the online version.')); },
@@ -108,8 +110,9 @@
     },
 
     saveProfile: function (profile) {
-      write(KEYS.profile, profile);
-      return Promise.resolve(profile);
+      var merged = Object.assign({}, read(KEYS.profile, {}), profile);
+      write(KEYS.profile, merged);
+      return Promise.resolve(merged);
     },
 
     // Right answers per category for each player, for category rewards.
@@ -125,6 +128,37 @@
       mine[category] = before + 1;
       write(KEYS.tallies, all);
       return Promise.resolve({ before: before, after: before + 1 });
+    },
+
+    // Questions answered per category, right or wrong, for strength charts.
+    addSeen: function (playerKey, category) {
+      var all = read(KEYS.seen, {});
+      var mine = all[playerKey] || (all[playerKey] = {});
+      mine[category] = (mine[category] || 0) + 1;
+      write(KEYS.seen, all);
+      return Promise.resolve();
+    },
+
+    // Everyone this device knows about, with their category counts.
+    // Online this becomes every signed-in player.
+    listPlayers: function () {
+      var tallies = read(KEYS.tallies, {});
+      var seen = read(KEYS.seen, {});
+      var profile = read(KEYS.profile, { name: '' });
+      var keys = Object.keys(seen);
+      Object.keys(tallies).forEach(function (k) { if (keys.indexOf(k) === -1) keys.push(k); });
+      return Promise.resolve(keys.map(function (k) {
+        var raw = k.replace(/^name:/, '');
+        var mine = profile.name && profile.name.trim().toLowerCase() === raw;
+        return {
+          key: k,
+          name: mine ? profile.name : raw.charAt(0).toUpperCase() + raw.slice(1),
+          avatar: mine ? profile.avatar : null,
+          showcase: mine ? profile.showcase || [] : [],
+          tallies: tallies[k] || {},
+          seen: seen[k] || {}
+        };
+      }));
     },
 
     getLastSetup: function () {

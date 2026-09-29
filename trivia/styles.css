@@ -619,13 +619,13 @@ a { color: var(--brass); }
   to { transform: scale(1); opacity: 1; }
 }
 
-.shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
 .shelf-item {
   display: flex; align-items: center; gap: 10px;
   background: var(--surface-2); border-radius: 10px; padding: 8px 10px;
   font-weight: 700; min-width: 0;
 }
-.shelf-item span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.shelf-item span:last-child { min-width: 0; overflow-wrap: break-word; }
 
 .chip-on { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 
@@ -641,3 +641,95 @@ a { color: var(--brass); }
 .ladder li::before { content: '○ '; }
 .ladder li.got { color: var(--ink); font-weight: 700; }
 .ladder li.got::before { content: '● '; color: var(--cat); }
+
+/* Accent themes: the player's pick replaces the brass accent in both modes */
+:root[data-accent="army"] { --brass: #56702a; --brass-ink: #ffffff; }
+@media (prefers-color-scheme: dark) { :root[data-accent="army"]:not([data-theme="light"]) { --brass: #8fae52; --brass-ink: #141a0c; } }
+:root[data-theme="dark"][data-accent="army"] { --brass: #8fae52; --brass-ink: #141a0c; }
+:root[data-accent="scrubs"] { --brass: #16807f; --brass-ink: #ffffff; }
+@media (prefers-color-scheme: dark) { :root[data-accent="scrubs"]:not([data-theme="light"]) { --brass: #3cbcb9; --brass-ink: #062423; } }
+:root[data-theme="dark"][data-accent="scrubs"] { --brass: #3cbcb9; --brass-ink: #062423; }
+:root[data-accent="navy"] { --brass: #2f4a86; --brass-ink: #ffffff; }
+@media (prefers-color-scheme: dark) { :root[data-accent="navy"]:not([data-theme="light"]) { --brass: #7d9be0; --brass-ink: #0c1428; } }
+:root[data-theme="dark"][data-accent="navy"] { --brass: #7d9be0; --brass-ink: #0c1428; }
+:root[data-accent="crimson"] { --brass: #b3322f; --brass-ink: #ffffff; }
+@media (prefers-color-scheme: dark) { :root[data-accent="crimson"]:not([data-theme="light"]) { --brass: #ef7a74; --brass-ink: #2a0b0a; } }
+:root[data-theme="dark"][data-accent="crimson"] { --brass: #ef7a74; --brass-ink: #2a0b0a; }
+.accent-brass { background: #a8781c; }
+.accent-army { background: #56702a; }
+.accent-scrubs { background: #16807f; }
+.accent-navy { background: #2f4a86; }
+.accent-crimson { background: #b3322f; }
+
+.topbar { flex-wrap: wrap; }
+.topbar-right { flex-wrap: nowrap; }
+.theme-panel { gap: 12px; }
+
+.swatch {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 10px; font-size: 0.875rem;
+  background: var(--surface); border: 2px solid var(--line);
+}
+.swatch[aria-pressed="true"] { border-color: var(--ink); background: var(--surface-2); }
+.swatch-dot { width: 18px; height: 18px; border-radius: 50%; flex: none; border: 1px solid #00000022; }
+.swatch .medal, .show-item .medal { width: 24px; height: 24px; border-width: 2px; font-size: 0.6rem; box-shadow: none; }
+
+/* Home navigation */
+.home-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+.home-nav button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; font-size: 0.9rem; }
+.nav-avatar { padding-block: 4px !important; }
+.badge {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: 999px; background: var(--bad); color: #fff; font-family: var(--mono); font-size: 0.75rem;
+}
+
+/* Avatars */
+.avatar { flex: none; border-radius: 50%; display: block; }
+.avatar-bg { fill: var(--cat, var(--brass)); }
+.avatar-preview { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.avatar-preview > .stack { min-width: 0; flex: 1; }
+.showcase { display: flex; flex-wrap: wrap; gap: 6px; }
+.show-item {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px;
+  padding: 2px 10px 2px 3px; font-size: 0.8rem; font-weight: 700;
+}
+
+/* Player list */
+.player-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  background: transparent; border: none; border-top: 1px solid var(--line); border-radius: 0; padding: 12px 0;
+  font-weight: 400;
+}
+.player-row:first-child { border-top: none; }
+.player-row:hover { background: var(--surface-2); }
+.player-row .main { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+
+/* Category strength chart: one row per category, bar length = right answers */
+.strength { display: flex; flex-direction: column; gap: 8px; }
+.strength-row {
+  display: grid; grid-template-columns: minmax(0, 11rem) 1fr 5.5rem; align-items: center; gap: 10px;
+  padding: 2px 4px; border-radius: 6px;
+}
+.strength-row:hover { background: var(--surface-2); }
+.strength-name { font-size: 0.875rem; font-weight: 700; overflow-wrap: anywhere; }
+.strength-track { height: 10px; background: var(--surface-2); border-radius: 0 4px 4px 0; }
+.strength-bar { display: block; height: 100%; background: var(--cat); border-radius: 0 4px 4px 0; }
+.strength-val { font-family: var(--mono); font-size: 0.875rem; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.strength-val .sub { color: var(--muted); font-weight: 400; }
+.strength-row.empty .strength-name { color: var(--muted); font-weight: 400; }
+@media (max-width: 460px) {
+  .strength-row { grid-template-columns: minmax(0, 1fr) 4.5rem; }
+  .strength-track { grid-column: 1 / -1; grid-row: 2; }
+}
+
+/* Trash talk */
+.msgs { display: flex; flex-direction: column; gap: 12px; max-height: 60vh; overflow-y: auto; padding-right: 4px; }
+.msg { display: flex; gap: 10px; align-items: flex-start; padding: 8px; border-radius: 10px; }
+.msg .main { min-width: 0; flex: 1; }
+.msg-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.msg-head .btn-small { padding: 0 6px; font-size: 0.75rem; color: var(--muted); border: none; }
+.msg-text { overflow-wrap: anywhere; white-space: pre-wrap; }
+.msg.mentions-me { background: color-mix(in srgb, var(--brass) 14%, var(--surface)); }
+.mention { font-weight: 700; color: var(--brass); }
+.mention.me { background: var(--brass); color: var(--brass-ink); border-radius: 4px; padding: 0 3px; }

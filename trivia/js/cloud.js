@@ -48,8 +48,9 @@
       if (!user) { profile = null; return done(); }
       var ref = db.collection('users').doc(user.uid);
       ref.get().then(function (snap) {
-        var name = (snap.exists && snap.data().name) || firstName(user);
-        profile = { uid: user.uid, name: name };
+        var data = snap.exists ? snap.data() : {};
+        var name = data.name || firstName(user);
+        profile = { uid: user.uid, name: name, avatar: data.avatar || null, showcase: data.showcase || [] };
         if (!snap.exists) return ref.set({ name: name, createdAt: now() });
       }).catch(function () {
         profile = { uid: user.uid, name: firstName(user) };
@@ -77,13 +78,37 @@
   // ---------- profile ----------
 
   Store.getProfile = function () {
-    return profile ? Promise.resolve({ name: profile.name }) : local.getProfile();
+    return profile
+      ? Promise.resolve({ name: profile.name, avatar: profile.avatar, showcase: profile.showcase })
+      : local.getProfile();
   };
 
+  // p may hold any of name, avatar, showcase.
   Store.saveProfile = function (p) {
     if (!profile) return local.saveProfile(p);
-    profile.name = p.name;
-    return db.collection('users').doc(profile.uid).set({ name: p.name }, { merge: true }).then(function () { return p; });
+    var patch = {};
+    ['name', 'avatar', 'showcase'].forEach(function (k) {
+      if (p[k] !== undefined) { patch[k] = p[k]; profile[k] = p[k]; }
+    });
+    return db.collection('users').doc(profile.uid).set(patch, { merge: true }).then(function () { return p; });
+  };
+
+  Store.listPlayers = function () {
+    if (!profile) return local.listPlayers();
+    return db.collection('users').get().then(function (snap) {
+      return snap.docs.map(function (d) {
+        var u = d.data();
+        return {
+          key: 'uid:' + d.id,
+          uid: d.id,
+          name: u.name || 'Player',
+          avatar: u.avatar || null,
+          showcase: u.showcase || [],
+          tallies: u.tallies || {},
+          seen: u.seen || {}
+        };
+      });
+    }).catch(function () { return local.listPlayers(); });
   };
 
   // ---------- daily challenge ----------
@@ -129,6 +154,43 @@
     patch['tallies.' + category] = fb.firestore.FieldValue.increment(1);
     db.collection('users').doc(profile.uid).update(patch).catch(function () {});
     return Promise.resolve({ before: before, after: before + 1 });
+  };
+
+  Store.addSeen = function (playerKey, category) {
+    if (!profile || playerKey !== 'uid:' + profile.uid) return local.addSeen(playerKey, category);
+    var patch = {};
+    patch['seen.' + category] = fb.firestore.FieldValue.increment(1);
+    db.collection('users').doc(profile.uid).update(patch).catch(function () {});
+    return Promise.resolve();
+  };
+
+  // ---------- trash-talk board ----------
+  // One public board for everyone. There are no private messages by design.
+
+  Store.board = {
+    watch: function (onChange) {
+      return db.collection('board').orderBy('createdAt', 'desc').limit(80).onSnapshot(function (snap) {
+        onChange(snap.docs.map(function (d) {
+          var m = d.data();
+          var at = m.createdAt && m.createdAt.toMillis ? m.createdAt.toMillis() : (typeof m.createdAt === 'number' ? m.createdAt : Date.now());
+          return { id: d.id, uid: m.uid, name: m.name, text: m.text, mentions: m.mentions || [], at: at };
+        }).reverse());
+      }, function () { onChange(null); });
+    },
+
+    post: function (text, mentions) {
+      return db.collection('board').add({
+        uid: profile.uid,
+        name: profile.name,
+        text: text,
+        mentions: mentions,
+        createdAt: now()
+      });
+    },
+
+    remove: function (id) {
+      return db.collection('board').doc(id).delete();
+    }
   };
 
   // ---------- shared question bank ----------

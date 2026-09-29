@@ -10,6 +10,7 @@
   var Daily = window.TriviaDaily;
   var Scoring = window.TriviaScoring;
   var Rewards = window.TriviaRewards;
+  var Avatar = window.TriviaAvatar;
 
   var MAX_PLAYERS = 8;
   var KEYS = ['A', 'B', 'C', 'D'];
@@ -31,6 +32,15 @@
     boardTab: 'today',
     tallies: {},
     trophyKey: null,
+    theme: readTheme(),
+    themeOpen: false,
+    profile: { avatar: null, showcase: [] },
+    avatarDraft: null,
+    showcaseDraft: null,
+    players: null,
+    viewPlayer: null,
+    board: null,
+    boardSeenAt: readBoardSeen(),
     live: null,
     liveError: '',
     liveBusy: false,
@@ -45,6 +55,34 @@
   };
 
   var timerHandle = null;
+
+  // ---------- theme (kept per device) ----------
+
+  var THEME_KEY = 'trivia.theme.v1';
+  var ACCENTS = [['brass', 'Brass'], ['army', 'Army green'], ['scrubs', 'Scrubs teal'], ['navy', 'Navy'], ['crimson', 'Crimson']];
+  var hostTheme = document.documentElement.getAttribute('data-theme');
+
+  function readTheme() {
+    try { return JSON.parse(window.localStorage.getItem('trivia.theme.v1')) || {}; } catch (e) { return {}; }
+  }
+
+  function applyTheme(t) {
+    var root = document.documentElement;
+    if (t.mode === 'light' || t.mode === 'dark') root.setAttribute('data-theme', t.mode);
+    else if (hostTheme) root.setAttribute('data-theme', hostTheme);
+    else root.removeAttribute('data-theme');
+    root.setAttribute('data-accent', t.accent || 'brass');
+  }
+
+  function saveTheme(t) {
+    state.theme = t;
+    applyTheme(t);
+    try { window.localStorage.setItem(THEME_KEY, JSON.stringify(t)); } catch (e) { /* stays for this visit */ }
+  }
+
+  function readBoardSeen() {
+    try { return Number(window.localStorage.getItem('trivia.boardSeen.v1')) || 0; } catch (e) { return 0; }
+  }
 
   // ---------- helpers ----------
 
@@ -184,6 +222,12 @@
   }
 
   // Counts a right answer and returns the reward it unlocked, if any.
+  // Counts every answer toward the strength chart, and right ones toward rewards.
+  function recordAnswer(name, category, right) {
+    Store.addSeen(tallyKey(name), category);
+    return right ? creditCorrect(name, category) : null;
+  }
+
   function creditCorrect(name, category) {
     var key = tallyKey(name);
     var mine = state.tallies[key] || (state.tallies[key] = {});
@@ -296,7 +340,7 @@
     g.points = right ? g.lastScore.total : 0;
 
     player.answered += 1;
-    g.unlock = right ? creditCorrect(player.name, item.q.category) : null;
+    g.unlock = recordAnswer(player.name, item.q.category, right);
     if (right) {
       player.correct += 1;
       player.score += g.points;
@@ -358,8 +402,28 @@
   function topbar(right) {
     return '<header class="topbar">' +
       '<p class="brand">Squad <span>Trivia</span></p>' +
-      (right || '') +
-      '</header>';
+      '<div class="row topbar-right">' +
+        '<button class="btn-small btn-ghost" data-action="theme-toggle" aria-expanded="' + state.themeOpen + '">Theme</button>' +
+        (right || '') +
+      '</div>' +
+      '</header>' + (state.themeOpen ? themePanel() : '');
+  }
+
+  function themePanel() {
+    var t = state.theme;
+    var mode = t.mode || 'auto';
+    var modes = [['auto', 'Match device'], ['light', 'Light'], ['dark', 'Dark']].map(function (m) {
+      return '<button data-action="theme-mode" data-value="' + m[0] + '" aria-pressed="' + (mode === m[0]) + '">' + m[1] + '</button>';
+    }).join('');
+    var accents = ACCENTS.map(function (a) {
+      var on = (t.accent || 'brass') === a[0];
+      return '<button class="swatch" data-action="theme-accent" data-value="' + a[0] + '" aria-pressed="' + on + '">' +
+        '<span class="swatch-dot accent-' + a[0] + '"></span>' + a[1] + '</button>';
+    }).join('');
+    return '<section class="card theme-panel">' +
+      '<div class="field"><span class="label">Mode</span><div class="seg">' + modes + '</div></div>' +
+      '<div class="field"><span class="label">Accent color</span><div class="chips">' + accents + '</div></div>' +
+      '</section>';
   }
 
   function scoreboard(highlight) {
@@ -433,8 +497,9 @@
         '</form>') +
         (streak ? '<p class="small muted">Current streak: ' + streak + ' day' + (streak === 1 ? '' : 's') + '</p>' : '');
 
-    return topbar('<button class="btn-small" data-action="board">Leaderboard</button>') +
+    return topbar('') +
       accountStrip() +
+      homeNav() +
       '<section class="card">' +
         '<div class="q-meta"><h2>Daily Challenge</h2><span class="progress">#' + plan.number + ' · ' + esc(date) + '</span></div>' +
         categoryBadges(plan.categories, plan.featured) + daily +
@@ -907,6 +972,275 @@
       '</section>';
   }
 
+  // ---------- players, avatars and trash talk ----------
+
+  function myAvatar() {
+    return state.profile.avatar || Avatar.forName(state.profileName || 'Player');
+  }
+
+  function avatarFor(player) {
+    return player.avatar || Avatar.forName(player.name);
+  }
+
+  function unreadMentions() {
+    var u = Store.user();
+    if (!u || !state.board) return 0;
+    return state.board.filter(function (m) {
+      return m.uid !== u.uid && m.at > state.boardSeenAt && m.mentions.indexOf(u.uid) !== -1;
+    }).length;
+  }
+
+  function homeNav() {
+    var badge = unreadMentions();
+    return '<nav class="home-nav" aria-label="Sections">' +
+      '<button data-action="board">Leaderboard</button>' +
+      '<button data-action="players">Players</button>' +
+      '<button data-action="talk">Trash talk' + (badge ? ' <span class="badge">' + badge + '</span>' : '') + '</button>' +
+      '<button data-action="trophies">Trophy case</button>' +
+      '<button class="nav-avatar" data-action="avatar">' + Avatar.svg(myAvatar(), 28, state.profileName) + 'My avatar</button>' +
+      '</nav>';
+  }
+
+  function showcaseHtml(list) {
+    if (!list || !list.length) return '';
+    return '<div class="showcase">' + list.map(function (id) {
+      var parts = id.split(':');
+      var r = Rewards.reward(parts[0], Number(parts[1]));
+      if (!r) return '';
+      return '<span class="show-item" data-cat="' + r.category + '" title="' + esc(r.tier + ' · ' + catName(r.category)) + '">' +
+        medal(r.category, r.level) + '<span>' + esc(r.item) + '</span></span>';
+    }).join('') + '</div>';
+  }
+
+  // Rewards this player has unlocked, as 'category:level' ids.
+  function unlockedIds(tallies) {
+    var out = [];
+    CATEGORIES.forEach(function (c) {
+      var lvl = Rewards.level((tallies || {})[c.id] || 0);
+      for (var i = lvl; i >= 0; i--) out.push(c.id + ':' + i);
+    });
+    return out.sort(function (a, b) { return Number(b.split(':')[1]) - Number(a.split(':')[1]); });
+  }
+
+  function viewAvatar() {
+    var a = state.avatarDraft || (state.avatarDraft = Avatar.normalize(myAvatar()));
+    var picks = state.showcaseDraft || (state.showcaseDraft = (state.profile.showcase || []).slice());
+    var rows = Object.keys(Avatar.OPTIONS).map(function (k) {
+      var opts = Avatar.OPTIONS[k].map(function (v) {
+        var on = a[k] === v;
+        var inner;
+        if (k === 'skin' || k === 'hairColor' || k === 'shirt') inner = '<span class="swatch-dot" style="background:' + v + '"></span>';
+        else if (k === 'bg') inner = '<span class="swatch-dot" data-cat="' + v + '" style="background:var(--cat)"></span>' + esc(catName(v));
+        else inner = esc(v.charAt(0).toUpperCase() + v.slice(1));
+        return '<button class="swatch" data-action="avatar-set" data-key="' + k + '" data-value="' + esc(v) + '" aria-pressed="' + on + '"' +
+          ' aria-label="' + esc(Avatar.LABELS[k] + ' ' + v) + '">' + inner + '</button>';
+      }).join('');
+      return '<div class="field"><span class="label">' + Avatar.LABELS[k] + '</span><div class="chips">' + opts + '</div></div>';
+    }).join('');
+
+    var key = myTallyKey();
+    var owned = unlockedIds(key ? state.tallies[key] : {});
+    var showcase = owned.length
+      ? '<div class="chips">' + owned.map(function (id) {
+          var parts = id.split(':');
+          var r = Rewards.reward(parts[0], Number(parts[1]));
+          var on = picks.indexOf(id) !== -1;
+          return '<button class="swatch" data-cat="' + r.category + '" data-action="showcase-toggle" data-value="' + id + '" aria-pressed="' + on + '">' +
+            medal(r.category, r.level) + esc(r.item) + '</button>';
+        }).join('') + '</div>'
+      : '<p class="small muted">Unlock rewards by getting 5 right in a category, then pick up to three to show off here.</p>';
+
+    var needName = !Store.user();
+    return topbar('<button class="btn-small" data-action="home">Home</button>') +
+      '<section class="card avatar-card">' +
+        '<h1>My avatar</h1>' +
+        '<div class="avatar-preview">' + Avatar.svg(a, 132, state.profileName) +
+          '<div class="stack"><p class="trophy-item">' + esc(state.profileName || 'Your name') + '</p>' + showcaseHtml(picks) + '</div></div>' +
+        (needName ? '<div class="field"><label class="label" for="avatar-name">Your name</label>' +
+          '<input type="text" id="avatar-name" maxlength="20" autocomplete="off" value="' + esc(state.profileName) + '"></div>' : '') +
+        rows +
+        '<div class="field"><span class="label">Show off (' + picks.length + '/3)</span>' + showcase + '</div>' +
+        '<button class="btn-primary" data-action="avatar-save">Save avatar</button>' +
+      '</section>';
+  }
+
+  function strengthRows(player) {
+    var rows = CATEGORIES.map(function (c) {
+      var right = player.tallies[c.id] || 0;
+      var seen = Math.max(player.seen[c.id] || 0, right);
+      return { cat: c.id, right: right, seen: seen, acc: seen ? Math.round(right / seen * 100) : null };
+    }).sort(function (a, b) { return b.right - a.right || (b.acc || 0) - (a.acc || 0); });
+    return rows;
+  }
+
+  function strengthChart(player) {
+    var rows = strengthRows(player);
+    var max = Math.max.apply(null, rows.map(function (r) { return r.right; }).concat([1]));
+    return '<div class="strength" role="table" aria-label="Right answers by category">' + rows.map(function (r, i) {
+      var tip = catName(r.cat) + ': ' + r.right + ' right' + (r.seen ? ' of ' + r.seen + ' (' + r.acc + '%)' : ', not played yet');
+      return '<div class="strength-row' + (r.seen ? '' : ' empty') + '" data-cat="' + r.cat + '" role="row" title="' + esc(tip) + '">' +
+        '<span class="strength-name" role="cell">' + esc(catName(r.cat)) + (i < 3 && r.right ? ' <span class="tag">Strong</span>' : '') + '</span>' +
+        '<span class="strength-track" role="cell">' + (r.right ? '<span class="strength-bar" style="width:' + (r.right / max * 100) + '%"></span>' : '') + '</span>' +
+        '<span class="strength-val" role="cell">' + (r.seen ? r.right + ' <span class="sub">' + r.acc + '%</span>' : '<span class="sub">none</span>') + '</span>' +
+        '</div>';
+    }).join('') + '</div>';
+  }
+
+  function playerTotals(player) {
+    var right = 0, seen = 0;
+    CATEGORIES.forEach(function (c) {
+      right += player.tallies[c.id] || 0;
+      seen += Math.max(player.seen[c.id] || 0, player.tallies[c.id] || 0);
+    });
+    return { right: right, seen: seen, acc: seen ? Math.round(right / seen * 100) : 0, trophies: earnedCount(player.tallies) };
+  }
+
+  function loadPlayers() {
+    return Store.listPlayers().then(function (list) {
+      state.players = list.sort(function (a, b) { return playerTotals(b).right - playerTotals(a).right; });
+    });
+  }
+
+  function viewPlayers() {
+    var list = state.players;
+    var body = !list
+      ? '<p class="muted">Loading players…</p>'
+      : !list.length
+        ? '<p class="muted">Players show up here after they answer their first question.</p>'
+        : '<div class="list">' + list.map(function (p) {
+            var t = playerTotals(p);
+            var top = strengthRows(p)[0];
+            return '<button class="player-row" data-action="player" data-key="' + esc(p.key) + '">' +
+              Avatar.svg(avatarFor(p), 48, p.name) +
+              '<span class="main"><strong>' + esc(p.name) + '</strong>' +
+                '<span class="small muted">' + t.right + ' right · ' + t.trophies + ' trophies' +
+                (top && top.right ? ' · best at ' + esc(catName(top.cat)) : '') + '</span>' +
+                showcaseHtml(p.showcase) + '</span></button>';
+          }).join('') + '</div>';
+    return topbar('<button class="btn-small" data-action="home">Home</button>') +
+      '<section class="card"><h1>Players</h1>' + body +
+        (Store.cloud && Store.user() ? '' : '<p class="small muted">This shows players on this device. The online version shows everyone signed in.</p>') +
+      '</section>';
+  }
+
+  function viewPlayer() {
+    var p = (state.players || []).filter(function (x) { return x.key === state.viewPlayer; })[0];
+    if (!p) return viewPlayers();
+    var t = playerTotals(p);
+    return topbar('<button class="btn-small" data-action="players">All players</button>') +
+      '<section class="card">' +
+        '<div class="avatar-preview">' + Avatar.svg(avatarFor(p), 112, p.name) +
+          '<div class="stack"><h1>' + esc(p.name) + '</h1>' + showcaseHtml(p.showcase) + '</div></div>' +
+        '<div class="stat-grid">' +
+          '<div class="stat"><div class="v">' + t.right + '</div><div class="k">right answers</div></div>' +
+          '<div class="stat"><div class="v">' + t.acc + '%</div><div class="k">accuracy</div></div>' +
+          '<div class="stat"><div class="v">' + t.trophies + '</div><div class="k">trophies</div></div>' +
+        '</div>' +
+      '</section>' +
+      '<section class="card"><h2>Category strength</h2>' +
+        '<p class="small muted">Bars show right answers in each category. The percentage is how often they get it right.</p>' +
+        strengthChart(p) +
+      '</section>';
+  }
+
+  function timeAgo(ms) {
+    var m = Math.round((Date.now() - ms) / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + 'm ago';
+    var h = Math.round(m / 60);
+    if (h < 24) return h + 'h ago';
+    return Math.round(h / 24) + 'd ago';
+  }
+
+  function withMentions(text) {
+    var html = esc(text);
+    var u = Store.user();
+    (state.players || []).slice().sort(function (a, b) { return b.name.length - a.name.length; }).forEach(function (p) {
+      var pattern = new RegExp('@' + esc(p.name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w])', 'gi');
+      html = html.replace(pattern, function (m) {
+        return '<span class="mention' + (u && p.uid === u.uid ? ' me' : '') + '">' + m + '</span>';
+      });
+    });
+    return html;
+  }
+
+  function viewTalk() {
+    var u = Store.user();
+    if (!Store.cloud || !u) {
+      return topbar('<button class="btn-small" data-action="home">Home</button>') +
+        '<section class="card"><h1>Trash talk</h1><p class="muted">The trash-talk board lives on the online version, where everyone is signed in: ' +
+        '<a href="https://humanvue.github.io/Humanvue/">humanvue.github.io/Humanvue</a></p>' +
+        (Store.cloud ? signInButton('Sign in with Google') : '') + '</section>';
+    }
+    var byUid = {};
+    (state.players || []).forEach(function (p) { if (p.uid) byUid[p.uid] = p; });
+    var msgs = state.board;
+    var list = !msgs
+      ? '<p class="muted">Loading…</p>'
+      : !msgs.length
+        ? '<p class="muted">No trash talk yet. Start it off.</p>'
+        : msgs.map(function (m) {
+            var who = byUid[m.uid] || { name: m.name };
+            var mine = m.uid === u.uid;
+            return '<div class="msg' + (m.mentions.indexOf(u.uid) !== -1 && !mine ? ' mentions-me' : '') + '">' +
+              Avatar.svg(avatarFor(who), 36, m.name) +
+              '<div class="main"><p class="msg-head"><strong>' + esc(m.name) + '</strong> <span class="small muted">' + timeAgo(m.at) + '</span>' +
+              (mine ? ' <button class="btn-ghost btn-small" data-action="talk-delete" data-id="' + esc(m.id) + '">Delete</button>' : '') + '</p>' +
+              '<p class="msg-text">' + withMentions(m.text) + '</p></div></div>';
+          }).join('');
+    return topbar('<button class="btn-small" data-action="home">Home</button>') +
+      '<section class="card"><h1>Trash talk</h1>' +
+        '<p class="small muted">One public board for the whole squad. Type @ to call someone out. There are no private messages.</p>' +
+        '<div class="msgs" id="msgs">' + list + '</div>' +
+        '<form class="stack" data-form="talk">' +
+          '<textarea id="talk-text" rows="2" maxlength="280" placeholder="Say something about @someone\'s score…" aria-label="Message"></textarea>' +
+          '<div class="chips" id="mention-list"></div>' +
+          '<button class="btn-primary" type="submit">Post</button>' +
+        '</form>' +
+      '</section>';
+  }
+
+  // Suggest players while someone types "@na…".
+  function updateMentionList() {
+    var box = document.getElementById('mention-list');
+    var field = document.getElementById('talk-text');
+    if (!box || !field) return;
+    var before = field.value.slice(0, field.selectionStart);
+    var m = before.match(/@([^\s@]{0,20})$/);
+    if (!m) { box.innerHTML = ''; return; }
+    var q = m[1].toLowerCase();
+    var me = Store.user();
+    box.innerHTML = (state.players || []).filter(function (p) {
+      return (!me || p.uid !== me.uid) && p.name.toLowerCase().indexOf(q) === 0;
+    }).slice(0, 6).map(function (p) {
+      return '<button type="button" class="swatch" data-action="mention-pick" data-name="' + esc(p.name) + '">@' + esc(p.name) + '</button>';
+    }).join('');
+  }
+
+  var boardStop = null;
+
+  function watchBoard() {
+    if (boardStop) { boardStop(); boardStop = null; }
+    state.board = null;
+    if (!Store.board || !Store.user()) return;
+    boardStop = Store.board.watch(function (msgs) {
+      state.board = msgs || [];
+      if (state.screen === 'talk') {
+        markBoardSeen();
+        render();
+        var box = document.getElementById('msgs');
+        if (box) box.scrollTop = box.scrollHeight;
+      } else if (state.screen === 'home') {
+        render();
+      }
+    });
+  }
+
+  function markBoardSeen() {
+    state.boardSeenAt = Date.now();
+    try { window.localStorage.setItem('trivia.boardSeen.v1', String(state.boardSeenAt)); } catch (e) { /* per visit */ }
+  }
+
   // ---------- live game ----------
 
   var LIVE_QUESTIONS = 10;
@@ -1038,7 +1372,7 @@
     var sc = right ? Scoring.score(item.difficulty, timeLeft, mine.streak + 1, item.category === g.featured) : null;
     var streak = right ? mine.streak + 1 : 0;
     L.lastScore = sc;
-    L.unlock = right ? creditCorrect(Store.user().name, item.category) : null;
+    L.unlock = recordAnswer(Store.user().name, item.category, right);
     L.unlockIndex = i;
     Store.live.answer(L.code, i, choice, sc ? sc.total : 0, {
       score: mine.score + (sc ? sc.total : 0),
@@ -1188,6 +1522,10 @@
     live: viewLive,
     board: viewBoard,
     trophies: viewTrophies,
+    avatar: viewAvatar,
+    players: viewPlayers,
+    player: viewPlayer,
+    talk: viewTalk,
     'daily-result': viewDailyResult,
     setup: viewSetup,
     handoff: viewHandoff,
@@ -1198,7 +1536,15 @@
   };
 
   function render() {
+    // Keep a half-typed message when the board refreshes underneath it.
+    var draft = document.getElementById('talk-text');
+    var keep = draft ? { value: draft.value, focused: document.activeElement === draft, pos: draft.selectionStart } : null;
     app.innerHTML = '<div class="shell">' + VIEWS[state.screen]() + '</div>';
+    var again = document.getElementById('talk-text');
+    if (keep && again) {
+      again.value = keep.value;
+      if (keep.focused) { again.focus(); again.setSelectionRange(keep.pos, keep.pos); }
+    }
   }
 
   // ---------- events ----------
@@ -1269,6 +1615,85 @@
         break;
       case 'board':
         go('board');
+        break;
+      case 'theme-toggle':
+        state.themeOpen = !state.themeOpen;
+        render();
+        break;
+      case 'theme-mode':
+        saveTheme(Object.assign({}, state.theme, { mode: el.getAttribute('data-value') }));
+        render();
+        break;
+      case 'theme-accent':
+        saveTheme(Object.assign({}, state.theme, { accent: el.getAttribute('data-value') }));
+        render();
+        break;
+      case 'avatar':
+        state.avatarDraft = null;
+        state.showcaseDraft = null;
+        go('avatar');
+        break;
+      case 'avatar-set':
+        state.avatarDraft[el.getAttribute('data-key')] = el.getAttribute('data-value');
+        render();
+        break;
+      case 'showcase-toggle': {
+        var sid = el.getAttribute('data-value');
+        var at = state.showcaseDraft.indexOf(sid);
+        if (at !== -1) state.showcaseDraft.splice(at, 1);
+        else if (state.showcaseDraft.length < 3) state.showcaseDraft.push(sid);
+        render();
+        break;
+      }
+      case 'avatar-save': {
+        var patch = { avatar: state.avatarDraft, showcase: state.showcaseDraft };
+        var nameField = document.getElementById('avatar-name');
+        if (nameField && nameField.value.trim()) {
+          patch.name = nameField.value.trim();
+          state.profileName = patch.name;
+        }
+        if (!Store.user() && !state.profileName) {
+          el.textContent = 'Add your name first';
+          break;
+        }
+        if (!patch.name) patch.name = state.profileName;
+        state.profile = { avatar: patch.avatar, showcase: patch.showcase };
+        Store.saveProfile(patch);
+        state.players = null;
+        go('home');
+        break;
+      }
+      case 'players':
+        state.players = state.players || null;
+        go('players');
+        loadPlayers().then(render);
+        break;
+      case 'player':
+        state.viewPlayer = el.getAttribute('data-key');
+        go('player');
+        break;
+      case 'talk':
+        markBoardSeen();
+        go('talk');
+        loadPlayers().then(function () {
+          render();
+          var box = document.getElementById('msgs');
+          if (box) box.scrollTop = box.scrollHeight;
+        });
+        break;
+      case 'mention-pick': {
+        var field = document.getElementById('talk-text');
+        var pos = field.selectionStart;
+        var start = field.value.slice(0, pos).replace(/@[^\s@]*$/, '');
+        field.value = start + '@' + el.getAttribute('data-name') + ' ' + field.value.slice(pos);
+        var caret = start.length + el.getAttribute('data-name').length + 2;
+        field.focus();
+        field.setSelectionRange(caret, caret);
+        updateMentionList();
+        break;
+      }
+      case 'talk-delete':
+        Store.board.remove(el.getAttribute('data-id'));
         break;
       case 'trophies':
         state.trophyKey = el.getAttribute('data-key') || state.trophyKey || myTallyKey();
@@ -1370,6 +1795,22 @@
       if (again && !again.disabled) again.focus();
     }
 
+    if (form === 'talk') {
+      var box = document.getElementById('talk-text');
+      var text = box.value.trim().slice(0, 280);
+      if (!text) return;
+      var lower = text.toLowerCase();
+      var mentions = (state.players || []).filter(function (p) {
+        return p.uid && lower.indexOf('@' + p.name.toLowerCase()) !== -1;
+      }).map(function (p) { return p.uid; }).slice(0, 10);
+      box.value = '';
+      updateMentionList();
+      Store.board.post(text, mentions).catch(function () {
+        var again = document.getElementById('talk-text');
+        if (again) again.value = text;
+      });
+    }
+
     if (form === 'rename') {
       var newName = document.getElementById('rename').value.trim();
       state.renaming = false;
@@ -1417,6 +1858,10 @@
     }
   });
 
+  app.addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'talk-text') updateMentionList();
+  });
+
   document.addEventListener('keydown', function (e) {
     var live = state.screen === 'live' && state.live && state.live.snap && state.live.snap.game.status === 'question';
     if ((state.screen !== 'question' && !live) || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1434,13 +1879,18 @@
       loadCustom(),
       loadDaily(),
       loadTallies(),
-      Store.getProfile().then(function (p) { state.profileName = (p && p.name) || ''; })
+      Store.getProfile().then(function (p) {
+        state.profileName = (p && p.name) || '';
+        state.profile = { avatar: (p && p.avatar) || null, showcase: (p && p.showcase) || [] };
+      })
     ]);
   }
 
   // Signing in or out swaps which scores and questions are shown.
   Store.onAuth(function () {
     state.renaming = false;
+    state.players = null;
+    watchBoard();
     loadShared().then(render, render);
   });
 
@@ -1457,5 +1907,6 @@
     })
   ]).then(render, render);
 
+  applyTheme(state.theme);
   render();
 })();
