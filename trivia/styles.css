@@ -21,6 +21,13 @@
   --c-pop: #b8336f;
   --c-sports: #b5541a;
   --c-geo: #2c67ad;
+  --c-politics: #34427a;
+  --c-ushistory: #b0302e;
+  --c-worldhistory: #8c6a10;
+  --c-philosophy: #7a3f95;
+  --c-film: #2a7f50;
+  --c-lit: #7a4a2d;
+  --c-auto: #58616d;
 
   --display: 'Bricolage Grotesque', 'Arial Black', system-ui, sans-serif;
   --body: 'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -50,6 +57,13 @@
     --c-pop: #d9538f;
     --c-sports: #d8773a;
     --c-geo: #4f8ad0;
+    --c-politics: #6f80c4;
+    --c-ushistory: #e0605a;
+    --c-worldhistory: #c9a23c;
+    --c-philosophy: #a86fc4;
+    --c-film: #4fb37b;
+    --c-lit: #b27f5c;
+    --c-auto: #8e98a5;
     color-scheme: dark;
   }
 }
@@ -73,6 +87,13 @@
   --c-pop: #d9538f;
   --c-sports: #d8773a;
   --c-geo: #4f8ad0;
+  --c-politics: #6f80c4;
+  --c-ushistory: #e0605a;
+  --c-worldhistory: #c9a23c;
+  --c-philosophy: #a86fc4;
+  --c-film: #4fb37b;
+  --c-lit: #b27f5c;
+  --c-auto: #8e98a5;
   color-scheme: dark;
 }
 
@@ -97,6 +118,13 @@ body {
 [data-cat="pop"] { --cat: var(--c-pop); }
 [data-cat="sports"] { --cat: var(--c-sports); }
 [data-cat="geo"] { --cat: var(--c-geo); }
+[data-cat="politics"] { --cat: var(--c-politics); }
+[data-cat="ushistory"] { --cat: var(--c-ushistory); }
+[data-cat="worldhistory"] { --cat: var(--c-worldhistory); }
+[data-cat="philosophy"] { --cat: var(--c-philosophy); }
+[data-cat="film"] { --cat: var(--c-film); }
+[data-cat="lit"] { --cat: var(--c-lit); }
+[data-cat="auto"] { --cat: var(--c-auto); }
 
 .shell {
   max-width: 600px;

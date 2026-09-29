@@ -300,7 +300,9 @@
           '</form>' +
           '<div class="chips">' + (players || '<span class="small muted">No players yet.</span>') + '</div>' +
         '</div>' +
-        '<div class="field"><span class="label">Categories</span><div class="cat-grid">' + cats + '</div></div>' +
+        '<div class="field"><div class="row" style="justify-content:space-between"><span class="label">Categories (' + s.categories.length + '/' + CATEGORIES.length + ')</span>' +
+          '<span class="row"><button class="btn-ghost btn-small" data-action="cats-all">All</button><button class="btn-ghost btn-small" data-action="cats-none">None</button></span></div>' +
+          '<div class="cat-grid">' + cats + '</div></div>' +
         '<div class="settings">' +
           '<div class="field"><span class="label">Questions each</span><div class="seg">' + perOptions + '</div></div>' +
           '<div class="field"><span class="label">Timer</span><div class="seg">' + timerOptions + '</div></div>' +
@@ -495,6 +497,15 @@
         render();
         break;
       }
+      case 'cats-all':
+        s.categories = CATEGORIES.map(function (c) { return c.id; });
+        state.setupError = '';
+        render();
+        break;
+      case 'cats-none':
+        s.categories = [];
+        render();
+        break;
       case 'per':
         s.perPlayer = Number(el.getAttribute('data-value'));
         render();

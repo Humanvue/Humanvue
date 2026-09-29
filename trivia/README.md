@@ -2,7 +2,7 @@
 
 Pass-and-play trivia for a group of friends on one phone or laptop.
 
-- 2 to 8 players (or solo), six color-coded categories, optional 15/20/30 second timer.
+- 2 to 8 players (or solo), 13 color-coded categories (108 questions), optional 15/20/30 second timer.
 - 100 points for a right answer plus up to 50 for speed.
 - Add your own questions in the **Question bank**; they join the mix in their category.
 - Recent games are kept as a simple history.
