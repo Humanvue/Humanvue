@@ -103,6 +103,34 @@
       .then(function () { return result; }, function () { return result; });
   };
 
+  // ---------- category rewards ----------
+  // The signed-in player's tallies live on their user doc so they follow them
+  // to any phone. Pass & Play guests stay on the device.
+
+  var myTallies = null;
+
+  Store.listTallies = function () {
+    return local.listTallies().then(function (all) {
+      if (!profile) return all;
+      return db.collection('users').doc(profile.uid).get().then(function (snap) {
+        myTallies = (snap.exists && snap.data().tallies) || {};
+        all['uid:' + profile.uid] = Object.assign({}, myTallies);
+        return all;
+      }, function () { return all; });
+    });
+  };
+
+  Store.addCorrect = function (playerKey, category) {
+    if (!profile || playerKey !== 'uid:' + profile.uid) return local.addCorrect(playerKey, category);
+    myTallies = myTallies || {};
+    var before = myTallies[category] || 0;
+    myTallies[category] = before + 1;
+    var patch = {};
+    patch['tallies.' + category] = fb.firestore.FieldValue.increment(1);
+    db.collection('users').doc(profile.uid).update(patch).catch(function () {});
+    return Promise.resolve({ before: before, after: before + 1 });
+  };
+
   // ---------- shared question bank ----------
 
   Store.listCustomQuestions = function () {

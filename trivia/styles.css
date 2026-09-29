@@ -580,3 +580,64 @@ input[type="text"], select, textarea {
 .round.good { color: var(--good); }
 .round.bad { color: var(--bad); }
 a { color: var(--brass); }
+
+/* Category rewards: a medal in the tier's metal, rimmed in the category color */
+.medal {
+  --metal: #b6bdb0;
+  flex: none;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: radial-gradient(circle at 35% 30%, #ffffffaa 0 12%, transparent 40%), var(--metal);
+  border: 3px solid var(--cat, var(--line));
+  box-shadow: inset 0 -3px 0 #0000002a;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #1a1e18;
+}
+.medal.tier-bronze { --metal: #c98a4b; }
+.medal.tier-silver { --metal: #c9ced4; }
+.medal.tier-gold { --metal: #e2b93b; }
+.medal.tier-platinum { --metal: #b8e0dc; }
+.medal.tier-diamond { --metal: linear-gradient(135deg, #d6f0ff, #a6c8ff 45%, #f3d9ff); background: radial-gradient(circle at 35% 30%, #ffffffcc 0 14%, transparent 40%), linear-gradient(135deg, #d6f0ff, #a6c8ff 45%, #f3d9ff); }
+.medal.locked { background: var(--surface-2); border-style: dashed; color: var(--muted); box-shadow: none; }
+
+.unlock {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 2px solid var(--cat);
+  background: color-mix(in srgb, var(--cat) 12%, var(--surface));
+  animation: unlock-pop 0.5s ease-out;
+}
+.unlock-item { font-family: var(--display); font-weight: 800; font-size: 1.25rem; line-height: 1.2; }
+@keyframes unlock-pop {
+  from { transform: scale(0.94); opacity: 0.4; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.shelf-item {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface-2); border-radius: 10px; padding: 8px 10px;
+  font-weight: 700; min-width: 0;
+}
+.shelf-item span:last-child { min-width: 0; overflow-wrap: anywhere; }
+
+.chip-on { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+
+.trophies { display: flex; flex-direction: column; }
+.trophy-row { display: flex; gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); }
+.trophy-row:first-child { border-top: none; }
+.trophy-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.trophy-item { font-family: var(--display); font-weight: 700; font-size: 1.1rem; }
+.tier-name { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.meter { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.meter > div { height: 100%; background: var(--cat); border-radius: inherit; }
+.ladder { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 0.8rem; color: var(--muted); }
+.ladder li::before { content: '○ '; }
+.ladder li.got { color: var(--ink); font-weight: 700; }
+.ladder li.got::before { content: '● '; color: var(--cat); }

@@ -5,6 +5,9 @@ Pass-and-play trivia for a group of friends on one phone or laptop.
 - 2 to 8 players (or solo), 13 color-coded categories (108 questions), optional 15/20/30 second timer.
 - Scoring: Easy 100, Medium 200, Hard 300, plus up to 25% for speed. Three right in a row
   scores x1.5, five or more x2. The category of the day scores x2 in every mode (`js/scoring.js`).
+- Category rewards: 5, 15, 30, 60 and 100 right answers in a category unlock five objects, each
+  better than the last (Nursing & Health goes Penlight, Pulse Oximeter, Stethoscope, Crash Cart,
+  Nightingale Lamp). See the ladders in `js/rewards.js` and your progress in the Trophy case.
 - Leaderboard: today's Daily Challenge results and all-time Daily Challenge points.
 - Add your own questions in the **Question bank**; they join the mix in their category.
 - Recent games are kept as a simple history.
@@ -74,6 +77,7 @@ without changing the game flow in `js/app.js`.
 - `styles.css` – look and feel, light and dark themes
 - `js/questions.js` – built-in categories and questions
 - `js/scoring.js` – point values, streak multiplier, category-of-the-day bonus
+- `js/rewards.js` – category reward ladders and unlock thresholds
 - `js/daily.js` – Daily Challenge question pick, share text and streaks
 - `js/store.js` – on-device storage (the default)
 - `js/cloud.js`, `js/firebase-config.js` – Firebase sign-in, shared scores and live games

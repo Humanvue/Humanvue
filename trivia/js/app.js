@@ -9,6 +9,7 @@
   var Store = window.TriviaStore;
   var Daily = window.TriviaDaily;
   var Scoring = window.TriviaScoring;
+  var Rewards = window.TriviaRewards;
 
   var MAX_PLAYERS = 8;
   var KEYS = ['A', 'B', 'C', 'D'];
@@ -28,6 +29,8 @@
     dailyResults: [],
     profileName: '',
     boardTab: 'today',
+    tallies: {},
+    trophyKey: null,
     live: null,
     liveError: '',
     liveBusy: false,
@@ -167,6 +170,29 @@
     return result.uid || result.player.trim().toLowerCase();
   }
 
+  // Which tally a player's right answers count toward (see Store.listTallies).
+  function tallyKey(name) {
+    var u = Store.user();
+    if (u && sameName(name, u.name)) return 'uid:' + u.uid;
+    return 'name:' + name.trim().toLowerCase();
+  }
+
+  function myTallyKey() {
+    var u = Store.user();
+    if (u) return 'uid:' + u.uid;
+    return state.profileName ? 'name:' + state.profileName.trim().toLowerCase() : null;
+  }
+
+  // Counts a right answer and returns the reward it unlocked, if any.
+  function creditCorrect(name, category) {
+    var key = tallyKey(name);
+    var mine = state.tallies[key] || (state.tallies[key] = {});
+    var before = mine[category] || 0;
+    mine[category] = before + 1;
+    Store.addCorrect(key, category);
+    return Rewards.unlocked(category, before, before + 1);
+  }
+
   function dailyFor(name, date) {
     var d = date || Daily.today();
     if (!name) return null;
@@ -270,6 +296,7 @@
     g.points = right ? g.lastScore.total : 0;
 
     player.answered += 1;
+    g.unlock = right ? creditCorrect(player.name, item.q.category) : null;
     if (right) {
       player.correct += 1;
       player.score += g.points;
@@ -312,6 +339,10 @@
 
   function loadHistory() {
     return Store.listGames(5).then(function (games) { state.history = games; });
+  }
+
+  function loadTallies() {
+    return Store.listTallies().then(function (all) { state.tallies = all || {}; });
   }
 
   function loadDaily() {
@@ -415,6 +446,7 @@
         '<button class="btn-ghost" data-action="bank">Add your own questions</button></div>' +
       '</section>' +
       liveCard() +
+      trophyCard() +
       scoringCard() +
       '<p class="footer-note">' + (Store.cloud && Store.user()
         ? 'Daily scores and custom questions are shared with everyone signed in.'
@@ -706,7 +738,7 @@
 
     return topbar(quitButton()) +
       '<section class="card question-card" data-cat="' + item.q.category + '">' +
-        questionHeader() + verdict + answersHtml(true) + streak +
+        questionHeader() + verdict + unlockBanner(g.unlock, p.name) + answersHtml(true) + streak +
         '<button class="btn-primary" data-action="next">' + nextLabel + '</button>' +
       '</section>' +
       '<section class="card"><h2>Scoreboard</h2>' + scoreboard(p) + '</section>';
@@ -779,6 +811,100 @@
         '</form>' +
       '</section>' +
       '<section class="card"><h2>Your questions (' + state.custom.length + ')</h2>' + list + '</section>';
+  }
+
+  // ---------- category rewards ----------
+
+  function medal(category, lvl, locked) {
+    var tier = lvl >= 0 ? Rewards.TIERS[lvl].name.toLowerCase() : 'none';
+    return '<span class="medal tier-' + tier + (locked ? ' locked' : '') + '" data-cat="' + category + '" aria-hidden="true">' +
+      '<span>' + (lvl >= 0 ? ['I', 'II', 'III', 'IV', 'V'][lvl] : '?') + '</span></span>';
+  }
+
+  function unlockBanner(unlock, name) {
+    if (!unlock) return '';
+    return '<div class="unlock" data-cat="' + unlock.category + '">' + medal(unlock.category, unlock.level) +
+      '<div><p class="label">' + esc(name) + ' unlocked a ' + unlock.tier + ' reward</p>' +
+      '<p class="unlock-item">' + esc(unlock.item) + '</p>' +
+      '<p class="small muted">' + unlock.need + ' right in ' + esc(catName(unlock.category)) + '</p></div></div>';
+  }
+
+  function earnedCount(tallies) {
+    var n = 0;
+    Object.keys(tallies || {}).forEach(function (cat) {
+      if (Rewards.ITEMS[cat]) n += Rewards.level(tallies[cat]) + 1;
+    });
+    return n;
+  }
+
+  function trophyCard() {
+    var key = myTallyKey();
+    var mine = key ? state.tallies[key] || {} : {};
+    var earned = earnedCount(mine);
+    // Show the three best items so far, or what is closest to unlocking.
+    var best = CATEGORIES.map(function (c) {
+      var count = mine[c.id] || 0;
+      return { cat: c.id, count: count, lvl: Rewards.level(count) };
+    }).filter(function (x) { return x.lvl >= 0; })
+      .sort(function (a, b) { return b.lvl - a.lvl || b.count - a.count; }).slice(0, 3);
+    var shelf = best.length
+      ? '<div class="shelf">' + best.map(function (x) {
+          var r = Rewards.reward(x.cat, x.lvl);
+          return '<div class="shelf-item" data-cat="' + x.cat + '">' + medal(x.cat, x.lvl) + '<span>' + esc(r.item) + '</span></div>';
+        }).join('') + '</div>'
+      : '<p class="muted">Get 5 right in any category to earn its first reward. Every category has five, from ' +
+        esc(Rewards.ITEMS.nursing[0]) + ' up to ' + esc(Rewards.ITEMS.nursing[4]) + ' in Nursing &amp; Health.</p>';
+    return '<section class="card">' +
+      '<div class="q-meta"><h2>Trophy case</h2><span class="progress">' + earned + ' of ' + Rewards.total() + '</span></div>' +
+      shelf + '<button data-action="trophies">Open trophy case</button></section>';
+  }
+
+  function viewTrophies() {
+    var myKey = myTallyKey();
+    var key = state.trophyKey || myKey;
+    var keys = Object.keys(state.tallies).filter(function (k) { return earnedCount(state.tallies[k]) > 0 || k === myKey; });
+    var nameOf = function (k) {
+      if (k.indexOf('uid:') === 0) return Store.user() ? Store.user().name : 'You';
+      var n = k.slice(5);
+      return n.charAt(0).toUpperCase() + n.slice(1);
+    };
+    var picker = keys.length > 1
+      ? '<div class="chips">' + keys.map(function (k) {
+          return '<button class="btn-small' + (k === key ? ' chip-on' : '') + '" data-action="trophies" data-key="' + esc(k) + '">' + esc(nameOf(k)) + '</button>';
+        }).join('') + '</div>'
+      : '';
+    var mine = (key && state.tallies[key]) || {};
+    var rows = CATEGORIES.map(function (c) {
+      var count = mine[c.id] || 0;
+      var lvl = Rewards.level(count);
+      var have = Rewards.reward(c.id, lvl);
+      var next = Rewards.next(c.id, count);
+      var prevNeed = lvl >= 0 ? Rewards.TIERS[lvl].need : 0;
+      var pct = next ? Math.round((count - prevNeed) / (next.need - prevNeed) * 100) : 100;
+      var ladder = Rewards.ITEMS[c.id].map(function (item, i) {
+        return '<li class="' + (i <= lvl ? 'got' : '') + '">' + esc(item) + '</li>';
+      }).join('');
+      return '<div class="trophy-row" data-cat="' + c.id + '">' +
+        medal(c.id, lvl, lvl < 0) +
+        '<div class="trophy-main">' +
+          '<p class="label">' + esc(c.name) + ' · ' + count + ' right</p>' +
+          '<p class="trophy-item">' + (have ? esc(have.item) + ' <span class="tier-name">' + have.tier + '</span>' : 'Nothing yet') + '</p>' +
+          (next
+            ? '<div class="meter"><div style="width:' + pct + '%"></div></div>' +
+              '<p class="small muted">' + (next.need - count) + ' more for ' + esc(next.item) + '</p>'
+            : '<p class="small muted">Every reward in this category unlocked.</p>') +
+          '<ol class="ladder">' + ladder + '</ol>' +
+        '</div></div>';
+    }).join('');
+    return topbar('<button class="btn-small" data-action="home">Home</button>') +
+      '<section class="card">' +
+        '<div class="q-meta"><h1>Trophy case</h1><span class="progress">' + earnedCount(mine) + ' of ' + Rewards.total() + '</span></div>' +
+        (key ? '' : '<p class="notice">Play the Daily Challenge once so the game knows your name, then your rewards show here.</p>') +
+        picker +
+        '<p class="small muted">Rewards unlock at ' + Rewards.TIERS.map(function (t) { return t.need; }).join(', ') +
+          ' right answers in a category, in any mode.</p>' +
+        '<div class="trophies">' + rows + '</div>' +
+      '</section>';
   }
 
   // ---------- live game ----------
@@ -912,6 +1038,8 @@
     var sc = right ? Scoring.score(item.difficulty, timeLeft, mine.streak + 1, item.category === g.featured) : null;
     var streak = right ? mine.streak + 1 : 0;
     L.lastScore = sc;
+    L.unlock = right ? creditCorrect(Store.user().name, item.category) : null;
+    L.unlockIndex = i;
     Store.live.answer(L.code, i, choice, sc ? sc.total : 0, {
       score: mine.score + (sc ? sc.total : 0),
       correct: mine.correct + (right ? 1 : 0),
@@ -1047,7 +1175,7 @@
     var last = g.index + 1 >= g.questions.length;
     return topbar(leave) +
       '<section class="card question-card" data-cat="' + item.category + '">' +
-        liveHeader(g, item) + verdict + answers +
+        liveHeader(g, item) + verdict + (L.unlockIndex === g.index ? unlockBanner(L.unlock, Store.user().name) : '') + answers +
         (isHost
           ? '<button class="btn-primary" data-action="live-next">' + (last ? 'Show final scores' : 'Next question') + '</button>'
           : '<p class="progress">Waiting for ' + esc(g.hostName) + ' to go on</p>') + err +
@@ -1059,6 +1187,7 @@
     home: viewHome,
     live: viewLive,
     board: viewBoard,
+    trophies: viewTrophies,
     'daily-result': viewDailyResult,
     setup: viewSetup,
     handoff: viewHandoff,
@@ -1140,6 +1269,10 @@
         break;
       case 'board':
         go('board');
+        break;
+      case 'trophies':
+        state.trophyKey = el.getAttribute('data-key') || state.trophyKey || myTallyKey();
+        go('trophies');
         break;
       case 'sign-in':
         state.signingIn = true;
@@ -1300,6 +1433,7 @@
     return Promise.all([
       loadCustom(),
       loadDaily(),
+      loadTallies(),
       Store.getProfile().then(function (p) { state.profileName = (p && p.name) || ''; })
     ]);
   }

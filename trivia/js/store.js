@@ -8,7 +8,8 @@
     history: 'trivia.history.v1',
     lastSetup: 'trivia.lastSetup.v1',
     daily: 'trivia.daily.v2',
-    profile: 'trivia.profile.v1'
+    profile: 'trivia.profile.v1',
+    tallies: 'trivia.tallies.v1'
   };
 
   // Browser storage can be missing or blocked (private windows, previews),
@@ -109,6 +110,21 @@
     saveProfile: function (profile) {
       write(KEYS.profile, profile);
       return Promise.resolve(profile);
+    },
+
+    // Right answers per category for each player, for category rewards.
+    // Keys are 'name:<lowercase name>' on a device or 'uid:<id>' when signed in.
+    listTallies: function () {
+      return Promise.resolve(read(KEYS.tallies, {}));
+    },
+
+    addCorrect: function (playerKey, category) {
+      var all = read(KEYS.tallies, {});
+      var mine = all[playerKey] || (all[playerKey] = {});
+      var before = mine[category] || 0;
+      mine[category] = before + 1;
+      write(KEYS.tallies, all);
+      return Promise.resolve({ before: before, after: before + 1 });
     },
 
     getLastSetup: function () {
