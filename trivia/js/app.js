@@ -7,9 +7,8 @@
   var BUILT_IN = window.TRIVIA_QUESTIONS;
   var Store = window.TriviaStore;
   var Daily = window.TriviaDaily;
+  var Scoring = window.TriviaScoring;
 
-  var BASE_POINTS = 100;
-  var SPEED_BONUS = 50;
   var MAX_PLAYERS = 8;
   var KEYS = ['A', 'B', 'C', 'D'];
 
@@ -25,7 +24,9 @@
     },
     custom: [],
     history: [],
-    dailyResults: {},
+    dailyResults: [],
+    profileName: '',
+    boardTab: 'today',
     copied: false,
     game: null,
     quitArmed: false,
@@ -138,18 +139,39 @@
       points: 0,
       deadline: 0,
       pattern: [],
+      featured: Daily.build(Daily.today()).featured,
+      lastScore: null,
       saved: false
     };
   }
 
-  function todaysDaily() {
-    return state.dailyResults[Daily.today()] || null;
+  function sameName(a, b) {
+    return a.trim().toLowerCase() === b.trim().toLowerCase();
   }
 
-  function startDaily() {
+  function dailyFor(name, date) {
+    var d = date || Daily.today();
+    if (!name) return null;
+    for (var i = 0; i < state.dailyResults.length; i++) {
+      var r = state.dailyResults[i];
+      if (r.date === d && sameName(r.player, name)) return r;
+    }
+    return null;
+  }
+
+  function todaysDaily() {
+    return dailyFor(state.profileName);
+  }
+
+  function startDaily(name) {
+    name = (name || '').trim();
+    if (!name) { state.dailyError = 'Enter your name so your score lands on the leaderboard.'; return render(); }
+    state.dailyError = '';
+    state.profileName = name;
+    Store.saveProfile({ name: name });
     if (todaysDaily()) return go('home');
     var plan = Daily.build(Daily.today());
-    state.game = newGame('daily', ['You'], plan.questions, plan.timer);
+    state.game = newGame('daily', [name], plan.questions, plan.timer);
     state.game.daily = plan;
     // Saved before the first question so quitting or reloading can't earn a replay.
     saveDailyProgress();
@@ -160,6 +182,7 @@
     var g = state.game;
     var p = g.players[0];
     var result = {
+      player: p.name,
       date: g.daily.date,
       number: g.daily.number,
       score: p.score,
@@ -168,7 +191,9 @@
       pattern: g.questions.map(function (_, i) { return !!g.pattern[i]; }),
       finished: !!done
     };
-    state.dailyResults[result.date] = result;
+    state.dailyResults = state.dailyResults.filter(function (r) {
+      return !(r.date === result.date && sameName(r.player, result.player));
+    }).concat([result]);
     return Store.saveDailyResult(result);
   }
 
@@ -211,7 +236,7 @@
   function answer(choice) {
     var g = state.game;
     if (state.screen !== 'question') return;
-    var left = g.timer ? Math.max(0, g.deadline - Date.now()) : 0;
+    var timeLeft = g.timer ? Math.max(0, g.deadline - Date.now()) / (g.timer * 1000) : null;
     stopTimer();
 
     var item = g.questions[g.index];
@@ -219,9 +244,10 @@
     var right = choice !== null && item.options[choice] === item.q.answer;
 
     g.picked = choice;
-    g.points = right
-      ? BASE_POINTS + (g.timer ? Math.round(SPEED_BONUS * left / (g.timer * 1000)) : 0)
-      : 0;
+    g.lastScore = right
+      ? Scoring.score(item.q.difficulty, timeLeft, player.streak + 1, item.q.category === g.featured)
+      : null;
+    g.points = right ? g.lastScore.total : 0;
 
     player.answered += 1;
     if (right) {
@@ -306,14 +332,18 @@
       (state.quitArmed ? 'Tap again to quit' : 'Quit game') + '</button>';
   }
 
-  function categoryBadges(ids) {
+  function categoryBadges(ids, featured) {
     return '<div class="chips">' + ids.map(function (id) {
-      return '<span class="cat-badge" data-cat="' + id + '">' + esc(catName(id)) + '</span>';
+      return '<span class="cat-badge" data-cat="' + id + '">' + esc(catName(id)) +
+        (id === featured ? ' · ×' + Scoring.FEATURED_BONUS : '') + '</span>';
     }).join('') + '</div>';
   }
 
   function dailyStreak() {
-    return Daily.streak(Object.keys(state.dailyResults), Daily.today());
+    var name = state.profileName;
+    var dates = state.dailyResults.filter(function (r) { return name && sameName(r.player, name); })
+      .map(function (r) { return r.date; });
+    return Daily.streak(dates, Daily.today());
   }
 
   function shareBlock(result) {
@@ -327,34 +357,113 @@
     var plan = Daily.build(date);
     var done = todaysDaily();
     var streak = dailyStreak();
+    var name = state.profileName;
 
     var daily = done
-      ? '<p class="muted">You played today. ' + (done.finished ? '' : 'Unanswered questions count as misses. ') +
+      ? '<p class="muted">' + esc(done.player) + ', you played today. ' + (done.finished ? '' : 'Unanswered questions count as misses. ') +
           'A new challenge unlocks at midnight.</p>' +
         '<div class="stat-grid">' +
           '<div class="stat"><div class="v">' + done.correct + '/' + done.total + '</div><div class="k">correct</div></div>' +
           '<div class="stat"><div class="v">' + done.score + '</div><div class="k">points</div></div>' +
           '<div class="stat"><div class="v">' + streak + '</div><div class="k">day streak</div></div>' +
-        '</div>' + shareBlock(done)
-      : '<p class="muted">Everyone gets the same 10 questions today. Play once, whenever you want, then post your score in the group chat.</p>' +
-        '<button class="btn-primary" data-action="daily">Play today\'s challenge</button>' +
+        '</div>' + shareBlock(done) +
+        '<button class="btn-ghost btn-small" data-action="switch-player">Someone else on this phone? Play as them</button>'
+      : '<p class="muted">Everyone gets the same 10 questions today. <strong>' + esc(catName(plan.featured)) +
+          '</strong> is the category of the day and scores double. Play once, whenever you want.</p>' +
+        '<form class="field" data-form="daily">' +
+          '<label class="label" for="daily-name">Your name</label>' +
+          '<input type="text" id="daily-name" maxlength="20" autocomplete="off" placeholder="Your name" value="' + esc(name) + '">' +
+          (state.dailyError ? '<p class="error">' + esc(state.dailyError) + '</p>' : '') +
+          '<button class="btn-primary" type="submit">Play today\'s challenge</button>' +
+        '</form>' +
         (streak ? '<p class="small muted">Current streak: ' + streak + ' day' + (streak === 1 ? '' : 's') + '</p>' : '');
 
-    return topbar('<button class="btn-small" data-action="bank">Question bank</button>') +
+    return topbar('<button class="btn-small" data-action="board">Leaderboard</button>') +
       '<section class="card">' +
         '<div class="q-meta"><h2>Daily Challenge</h2><span class="progress">#' + plan.number + ' · ' + esc(date) + '</span></div>' +
-        categoryBadges(plan.categories) + daily +
+        categoryBadges(plan.categories, plan.featured) + daily +
       '</section>' +
       '<section class="card">' +
         '<h2>Pass &amp; Play</h2>' +
         '<p class="muted">Everyone in the same room, one phone passed around. Pick the players, categories and timer.</p>' +
-        '<button data-action="setup">Set up a game</button>' +
+        '<div class="row"><button data-action="setup">Set up a game</button>' +
+        '<button class="btn-ghost" data-action="bank">Add your own questions</button></div>' +
       '</section>' +
       '<section class="card mode-soon">' +
         '<div class="q-meta"><h2>Live Game</h2><span class="soon">Coming soon</span></div>' +
-        '<p class="muted">Everyone answers on their own phone at the same moment, from anywhere, with a shared leaderboard. This turns on once the free hosting and sign-in are set up.</p>' +
+        '<p class="muted">Everyone answers on their own phone at the same moment, from anywhere. This turns on once the free hosting and sign-in are set up.</p>' +
       '</section>' +
-      '<p class="footer-note">Scores and your own questions are saved on this device only.</p>';
+      scoringCard() +
+      '<p class="footer-note">Scores and your own questions are saved on this device until shared hosting is set up.</p>';
+  }
+
+  function scoringCard() {
+    return '<section class="card"><h2>How scoring works</h2>' +
+      '<div class="rules">' +
+        '<div><span class="tag diff-1">Easy</span> 100</div>' +
+        '<div><span class="tag diff-2">Medium</span> 200</div>' +
+        '<div><span class="tag diff-3">Hard</span> 300</div>' +
+      '</div>' +
+      '<ul class="rule-list">' +
+        '<li>Answer fast for up to 25% more.</li>' +
+        '<li>3 right in a row scores ×1.5, and 5 or more in a row scores ×2.</li>' +
+        '<li>The category of the day scores ×' + Scoring.FEATURED_BONUS + ', in every mode.</li>' +
+      '</ul></section>';
+  }
+
+  function aggregate() {
+    var byName = {};
+    state.dailyResults.forEach(function (r) {
+      var key = r.player.trim().toLowerCase();
+      var row = byName[key] || (byName[key] = { name: r.player, points: 0, days: 0, correct: 0, total: 0, best: 0 });
+      row.points += r.score;
+      row.days += 1;
+      row.correct += r.correct;
+      row.total += r.total;
+      row.best = Math.max(row.best, r.score);
+    });
+    return Object.keys(byName).map(function (k) { return byName[k]; })
+      .sort(function (a, b) { return b.points - a.points || b.correct - a.correct; });
+  }
+
+  function viewBoard() {
+    var date = Daily.today();
+    var tab = state.boardTab;
+    var body;
+    if (tab === 'today') {
+      var rows = state.dailyResults.filter(function (r) { return r.date === date; })
+        .sort(function (a, b) { return b.score - a.score || b.correct - a.correct; });
+      body = rows.length
+        ? '<div class="board">' + rows.map(function (r, i) {
+            return '<div class="board-row' + (sameName(r.player, state.profileName) ? ' current' : '') + '">' +
+              '<span class="rank">' + (i + 1) + '</span>' +
+              '<span class="name">' + esc(r.player) + ' <span class="sub">' + r.correct + '/' + r.total + '</span>' +
+              '<span class="dots">' + r.pattern.map(function (hit) { return '<i class="' + (hit ? 'hit' : 'miss') + '"></i>'; }).join('') + '</span></span>' +
+              '<span class="score">' + r.score + '</span></div>';
+          }).join('') + '</div>'
+        : '<p class="muted">Nobody has played today\'s challenge yet.</p>';
+    } else {
+      var all = aggregate();
+      body = all.length
+        ? '<div class="board">' + all.map(function (r, i) {
+            return '<div class="board-row' + (sameName(r.name, state.profileName) ? ' current' : '') + '">' +
+              '<span class="rank">' + (i + 1) + '</span>' +
+              '<span class="name">' + esc(r.name) + ' <span class="sub">' + r.days + ' day' + (r.days === 1 ? '' : 's') +
+              ' · ' + Math.round(r.correct / r.total * 100) + '% right · best ' + r.best + '</span></span>' +
+              '<span class="score">' + r.points + '</span></div>';
+          }).join('') + '</div>'
+        : '<p class="muted">Totals appear after the first Daily Challenge.</p>';
+    }
+    return topbar('<button class="btn-small" data-action="home">Home</button>') +
+      '<section class="card">' +
+        '<div class="q-meta"><h1>Leaderboard</h1><span class="progress">Daily #' + Daily.number(date) + '</span></div>' +
+        '<div class="seg" role="tablist">' +
+          '<button data-action="board-tab" data-value="today" aria-pressed="' + (tab === 'today') + '">Today</button>' +
+          '<button data-action="board-tab" data-value="all" aria-pressed="' + (tab === 'all') + '">All time</button>' +
+        '</div>' + body +
+        '<p class="small muted">Daily Challenge points only, since everyone gets the same questions. ' +
+          'For now this lists people who played on this device. Once shared hosting is on, it shows the whole group.</p>' +
+      '</section>';
   }
 
   function viewDailyResult() {
@@ -370,7 +479,8 @@
         '</div>' +
       '</section>' +
       '<section class="card">' + shareBlock(result) +
-        '<button data-action="home">Back to home</button>' +
+        '<button data-action="board">See the leaderboard</button>' +
+        '<button class="btn-ghost" data-action="home">Back to home</button>' +
       '</section>';
   }
 
@@ -474,9 +584,25 @@
     var g = state.game;
     var item = g.questions[g.index];
     var p = currentPlayer();
+    var d = item.q.difficulty || 2;
+    var featured = item.q.category === g.featured;
+    var nextX = Scoring.streakMultiplier(p.streak + 1);
+    var tags = '<span class="tag diff-' + d + '">' + Scoring.LABEL[d] + ' · ' + Scoring.BASE[d] + '</span>' +
+      (featured ? '<span class="tag tag-featured">Category of the day ×' + Scoring.FEATURED_BONUS + '</span>' : '') +
+      (nextX > 1 ? '<span class="tag tag-streak">Streak ×' + nextX + '</span>' : '');
     return '<div class="q-meta"><span class="cat-badge">' + esc(catName(item.q.category)) + (item.q.custom ? ' · Custom' : '') + '</span>' +
       '<span class="progress">' + esc(p.name) + ' · ' + progressText() + '</span></div>' +
+      '<div class="tags">' + tags + '</div>' +
       '<p class="q-text">' + esc(item.q.q) + '</p>';
+  }
+
+  function breakdown(sc) {
+    var parts = [sc.base + ' base'];
+    if (sc.speed) parts.push('+' + sc.speed + ' speed');
+    var line = parts.join(' ');
+    if (sc.streakX > 1) line += ' · ×' + sc.streakX + ' streak';
+    if (sc.featuredX > 1) line += ' · ×' + sc.featuredX + ' category of the day';
+    return '<span class="breakdown">' + line + '</span>';
   }
 
   function viewQuestion() {
@@ -503,7 +629,7 @@
     var nextName = last ? '' : g.players[(g.index + 1) % g.players.length].name;
 
     var verdict = right
-      ? '<div class="verdict good"><strong>Correct</strong><span class="pts">+' + g.points + '</span></div>'
+      ? '<div class="verdict good"><strong>Correct</strong><span class="pts">+' + g.points + '</span>' + breakdown(g.lastScore) + '</div>'
       : '<div class="verdict bad"><strong>' + (timedOut ? 'Time\'s up' : 'Not quite') + '</strong><span>Answer: ' + esc(item.q.answer) + '</span></div>';
 
     var streak = right && p.streak >= 3 ? '<p class="small muted">' + esc(p.name) + ' is on a ' + p.streak + '-answer streak.</p>' : '';
@@ -567,7 +693,12 @@
         '<h1>Question bank</h1>' +
         '<div class="chips">' + counts + '</div>' +
         '<form class="stack" data-form="add-question">' +
-          '<div class="field"><label class="label" for="q-cat">Category</label><select id="q-cat">' + options + '</select></div>' +
+          '<div class="settings">' +
+            '<div class="field"><label class="label" for="q-cat">Category</label><select id="q-cat">' + options + '</select></div>' +
+            '<div class="field"><label class="label" for="q-diff">Difficulty</label><select id="q-diff">' +
+              '<option value="1">Easy · 100</option><option value="2" selected>Medium · 200</option><option value="3">Hard · 300</option>' +
+            '</select></div>' +
+          '</div>' +
           '<div class="field"><label class="label" for="q-text">Question</label><textarea id="q-text" rows="2" maxlength="200" placeholder="What is the normal adult oral temperature in °F?"></textarea></div>' +
           '<div class="field"><label class="label" for="q-answer">Right answer</label><input type="text" id="q-answer" maxlength="80" placeholder="98.6°F"></div>' +
           '<div class="field"><span class="label">Wrong answers</span><div class="wrong-grid">' +
@@ -584,6 +715,7 @@
 
   var VIEWS = {
     home: viewHome,
+    board: viewBoard,
     'daily-result': viewDailyResult,
     setup: viewSetup,
     handoff: viewHandoff,
@@ -663,8 +795,19 @@
       case 'setup':
         go('setup');
         break;
-      case 'daily':
-        startDaily();
+      case 'board':
+        go('board');
+        break;
+      case 'board-tab':
+        state.boardTab = el.getAttribute('data-value');
+        render();
+        break;
+      case 'switch-player':
+        state.profileName = '';
+        state.copied = false;
+        render();
+        var field = document.getElementById('daily-name');
+        if (field) field.focus();
         break;
       case 'copy-share': {
         var text = document.getElementById('share-text').textContent;
@@ -722,10 +865,15 @@
       if (again && !again.disabled) again.focus();
     }
 
+    if (form === 'daily') {
+      startDaily(document.getElementById('daily-name').value);
+    }
+
     if (form === 'add-question') {
       var get = function (id) { return document.getElementById(id).value.trim(); };
       var q = {
         category: get('q-cat'),
+        difficulty: Number(get('q-diff')) || 2,
         q: get('q-text'),
         answer: get('q-answer'),
         wrong: [get('q-wrong-1'), get('q-wrong-2'), get('q-wrong-3')]
@@ -764,6 +912,7 @@
     loadCustom(),
     loadHistory(),
     loadDaily(),
+    Store.getProfile().then(function (p) { state.profileName = (p && p.name) || ''; }),
     Store.getLastSetup().then(function (saved) {
       if (saved && Array.isArray(saved.players)) {
         state.setup.players = saved.players.slice(0, MAX_PLAYERS);

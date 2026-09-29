@@ -150,3 +150,16 @@ window.TRIVIA_QUESTIONS = [
   { id: 'a7', category: 'auto', q: 'Which brand makes the Wrangler?', answer: 'Jeep', wrong: ['Land Rover', 'Toyota', 'Ford'] },
   { id: 'a8', category: 'auto', q: 'What does "V8" describe?', answer: 'Eight cylinders in a V shape', wrong: ['Eight valves per cylinder', 'An 8-speed transmission', 'An 8-liter engine'] }
 ];
+
+// Difficulty sets the base points: 1 easy (100), 2 medium (200), 3 hard (300).
+// Pitched at players aged 30 to 50. Anything not listed is medium.
+(function () {
+  var EASY = ['m1', 'm4', 'm5', 'm6', 'm9', 'n3', 's2', 's3', 's4', 's5', 's6',
+    'p1', 'p3', 'p4', 'p6', 'p7', 'sp2', 'sp3', 'sp4', 'sp6', 'sp7', 'sp8',
+    'g2', 'g4', 'g7', 'g8', 'po1', 'po4', 'po8', 'ah3', 'ah4', 'ah8', 'wh6', 'wh8',
+    'ph2', 'f1', 'f2', 'f3', 'f4', 'f8', 'l1', 'l2', 'l4', 'l5', 'l7', 'l8', 'a1', 'a4', 'a7'];
+  var HARD = ['m7', 'n6', 'n9', 'n10', 's8', 'ah1', 'wh4', 'ph4', 'ph6', 'ph8', 'f5'];
+  window.TRIVIA_QUESTIONS.forEach(function (q) {
+    q.difficulty = EASY.indexOf(q.id) !== -1 ? 1 : HARD.indexOf(q.id) !== -1 ? 3 : 2;
+  });
+})();

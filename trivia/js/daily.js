@@ -1,6 +1,7 @@
 // Daily Challenge: everyone gets the same questions on the same date without
 // any server. The date seeds a random generator, which picks the day's three
-// categories, ten built-in questions and the answer order. Custom questions
+// categories (the first is the category of the day), ten built-in questions
+// and the answer order. Custom questions
 // are left out because they only exist on one device.
 (function () {
   var QUESTIONS_PER_DAY = 10;
@@ -60,7 +61,8 @@
     var questions = seededShuffle(pool, rand).slice(0, QUESTIONS_PER_DAY).map(function (q) {
       return { q: q, options: seededShuffle([q.answer].concat(q.wrong), rand) };
     });
-    return { date: date, number: number(date), categories: cats, questions: questions, timer: TIMER };
+    // The first category drawn is the day's featured category (double points).
+    return { date: date, number: number(date), categories: cats, featured: cats[0], questions: questions, timer: TIMER };
   }
 
   function shareText(result) {

@@ -3,7 +3,9 @@
 Pass-and-play trivia for a group of friends on one phone or laptop.
 
 - 2 to 8 players (or solo), 13 color-coded categories (108 questions), optional 15/20/30 second timer.
-- 100 points for a right answer plus up to 50 for speed.
+- Scoring: Easy 100, Medium 200, Hard 300, plus up to 25% for speed. Three right in a row
+  scores x1.5, five or more x2. The category of the day scores x2 in every mode (`js/scoring.js`).
+- Leaderboard: today's Daily Challenge results and all-time Daily Challenge points.
 - Add your own questions in the **Question bank**; they join the mix in their category.
 - Recent games are kept as a simple history.
 - **Daily Challenge:** everyone gets the same 10 questions each day (3 rotating categories), plays once,
@@ -44,6 +46,8 @@ Supabase) with the same method names:
 | --- | --- |
 | `listCustomQuestions`, `addCustomQuestion`, `deleteCustomQuestion` | A shared question bank for the whole group |
 | `listGames`, `saveGame`, `clearGames` | A shared leaderboard / game history per user |
+| `listDailyResults`, `saveDailyResult` | The group leaderboard (today and all time) |
+| `getProfile`, `saveProfile` | The signed-in user |
 | `getLastSetup`, `saveLastSetup` | Per-user preferences |
 
 Players are plain names today. When accounts arrive, each player entry can gain a `userId`
@@ -54,6 +58,7 @@ without changing the game flow in `js/app.js`.
 - `index.html` – page shell
 - `styles.css` – look and feel, light and dark themes
 - `js/questions.js` – built-in categories and questions
+- `js/scoring.js` – point values, streak multiplier, category-of-the-day bonus
 - `js/daily.js` – Daily Challenge question pick, share text and streaks
 - `js/store.js` – storage layer (swap this for a database)
 - `js/app.js` – game screens and rules

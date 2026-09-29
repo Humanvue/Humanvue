@@ -7,7 +7,8 @@
     custom: 'trivia.customQuestions.v1',
     history: 'trivia.history.v1',
     lastSetup: 'trivia.lastSetup.v1',
-    daily: 'trivia.daily.v1'
+    daily: 'trivia.daily.v2',
+    profile: 'trivia.profile.v1'
   };
 
   // Browser storage can be missing or blocked (private windows, previews),
@@ -75,16 +76,30 @@
       return Promise.resolve();
     },
 
-    // Daily Challenge results, keyed by date (YYYY-MM-DD).
+    // Daily Challenge results: one per player per date. With a shared
+    // backend this becomes the group leaderboard.
     listDailyResults: function () {
-      return Promise.resolve(read(KEYS.daily, {}));
+      return Promise.resolve(read(KEYS.daily, []));
     },
 
     saveDailyResult: function (result) {
-      var all = read(KEYS.daily, {});
-      all[result.date] = result;
+      var key = result.date + '|' + result.player.toLowerCase();
+      var all = read(KEYS.daily, []).filter(function (r) {
+        return r.date + '|' + r.player.toLowerCase() !== key;
+      });
+      all.push(result);
       write(KEYS.daily, all);
       return Promise.resolve(result);
+    },
+
+    // Who is playing on this device. Becomes the signed-in user later.
+    getProfile: function () {
+      return Promise.resolve(read(KEYS.profile, { name: '' }));
+    },
+
+    saveProfile: function (profile) {
+      write(KEYS.profile, profile);
+      return Promise.resolve(profile);
     },
 
     getLastSetup: function () {
