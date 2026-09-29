@@ -31,6 +31,21 @@ sh tools/build-single-file.sh > squad-trivia.html
 `.github/workflows/trivia-pages.yml` publishes this folder to GitHub Pages on every push.
 Turn it on once under **Settings > Pages > Source: GitHub Actions** (Pages on the free plan needs a public repo).
 
+## Online mode (Firebase)
+
+The GitHub Pages build loads the Firebase SDK, `js/firebase-config.js` and `js/cloud.js`. With them:
+
+- Players sign in with Google.
+- Daily Challenge results and custom questions are shared, so the leaderboard shows the whole group.
+- **Live Game**: a host gets a 4-letter code, friends join on their own phones, and everyone answers
+  the same question at the same time. The host's phone moves the game along.
+
+Firestore access is controlled by `firestore.rules`. Paste it into Firebase console >
+Firestore Database > Rules whenever it changes. Add `humanvue.github.io` under
+Authentication > Settings > Authorized domains so Google sign-in works on Pages.
+
+The single-file Artifact build leaves Firebase out, so it always stays on the device.
+
 ## Where data lives
 
 Everything is saved in the browser (`localStorage`) through `js/store.js`, so scores and custom
@@ -60,5 +75,7 @@ without changing the game flow in `js/app.js`.
 - `js/questions.js` – built-in categories and questions
 - `js/scoring.js` – point values, streak multiplier, category-of-the-day bonus
 - `js/daily.js` – Daily Challenge question pick, share text and streaks
-- `js/store.js` – storage layer (swap this for a database)
+- `js/store.js` – on-device storage (the default)
+- `js/cloud.js`, `js/firebase-config.js` – Firebase sign-in, shared scores and live games
+- `firestore.rules` – who can read and write what online
 - `js/app.js` – game screens and rules

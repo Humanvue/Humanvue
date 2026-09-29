@@ -1,6 +1,7 @@
 // Squad Trivia: trivia for a group of friends.
 // Modes: Pass & Play (one phone, setup -> handoff/question/reveal -> results)
-// and Daily Challenge (same 10 questions for everyone each day, see daily.js).
+// Daily Challenge (same 10 questions for everyone each day, see daily.js)
+// and Live Game (everyone on their own phone; needs the online version).
 // All saving goes through window.TriviaStore (see store.js).
 (function () {
   var CATEGORIES = window.TRIVIA_CATEGORIES;
@@ -27,6 +28,11 @@
     dailyResults: [],
     profileName: '',
     boardTab: 'today',
+    live: null,
+    liveError: '',
+    liveBusy: false,
+    signingIn: false,
+    renaming: false,
     copied: false,
     game: null,
     quitArmed: false,
@@ -81,6 +87,7 @@
 
   function go(screen) {
     stopTimer();
+    if (screen !== 'live' && state.live) liveReset();
     state.screen = screen;
     state.quitArmed = false;
     render();
@@ -149,12 +156,23 @@
     return a.trim().toLowerCase() === b.trim().toLowerCase();
   }
 
+  // Online results carry a uid, so two friends with the same name stay apart.
+  function isMe(result) {
+    var u = Store.user();
+    if (u && result.uid) return result.uid === u.uid;
+    return !!state.profileName && sameName(result.player, state.profileName);
+  }
+
+  function playerKey(result) {
+    return result.uid || result.player.trim().toLowerCase();
+  }
+
   function dailyFor(name, date) {
     var d = date || Daily.today();
     if (!name) return null;
     for (var i = 0; i < state.dailyResults.length; i++) {
       var r = state.dailyResults[i];
-      if (r.date === d && sameName(r.player, name)) return r;
+      if (r.date === d && (Store.user() ? isMe(r) : sameName(r.player, name))) return r;
     }
     return null;
   }
@@ -191,8 +209,10 @@
       pattern: g.questions.map(function (_, i) { return !!g.pattern[i]; }),
       finished: !!done
     };
+    var u = Store.user();
+    if (u) result.uid = u.uid;
     state.dailyResults = state.dailyResults.filter(function (r) {
-      return !(r.date === result.date && sameName(r.player, result.player));
+      return !(r.date === result.date && playerKey(r) === playerKey(result));
     }).concat([result]);
     return Store.saveDailyResult(result);
   }
@@ -341,7 +361,7 @@
 
   function dailyStreak() {
     var name = state.profileName;
-    var dates = state.dailyResults.filter(function (r) { return name && sameName(r.player, name); })
+    var dates = state.dailyResults.filter(function (r) { return name && isMe(r); })
       .map(function (r) { return r.date; });
     return Daily.streak(dates, Daily.today());
   }
@@ -367,18 +387,23 @@
           '<div class="stat"><div class="v">' + done.score + '</div><div class="k">points</div></div>' +
           '<div class="stat"><div class="v">' + streak + '</div><div class="k">day streak</div></div>' +
         '</div>' + shareBlock(done) +
-        '<button class="btn-ghost btn-small" data-action="switch-player">Someone else on this phone? Play as them</button>'
+        (Store.cloud ? '' : '<button class="btn-ghost btn-small" data-action="switch-player">Someone else on this phone? Play as them</button>')
       : '<p class="muted">Everyone gets the same 10 questions today. <strong>' + esc(catName(plan.featured)) +
           '</strong> is the category of the day and scores double. Play once, whenever you want.</p>' +
-        '<form class="field" data-form="daily">' +
+        (Store.cloud
+          ? (Store.user()
+              ? '<button class="btn-primary" data-action="daily-cloud">Play today\'s challenge</button>'
+              : signInButton('Sign in with Google to play'))
+          : '<form class="field" data-form="daily">' +
           '<label class="label" for="daily-name">Your name</label>' +
           '<input type="text" id="daily-name" maxlength="20" autocomplete="off" placeholder="Your name" value="' + esc(name) + '">' +
           (state.dailyError ? '<p class="error">' + esc(state.dailyError) + '</p>' : '') +
           '<button class="btn-primary" type="submit">Play today\'s challenge</button>' +
-        '</form>' +
+        '</form>') +
         (streak ? '<p class="small muted">Current streak: ' + streak + ' day' + (streak === 1 ? '' : 's') + '</p>' : '');
 
     return topbar('<button class="btn-small" data-action="board">Leaderboard</button>') +
+      accountStrip() +
       '<section class="card">' +
         '<div class="q-meta"><h2>Daily Challenge</h2><span class="progress">#' + plan.number + ' · ' + esc(date) + '</span></div>' +
         categoryBadges(plan.categories, plan.featured) + daily +
@@ -389,12 +414,55 @@
         '<div class="row"><button data-action="setup">Set up a game</button>' +
         '<button class="btn-ghost" data-action="bank">Add your own questions</button></div>' +
       '</section>' +
-      '<section class="card mode-soon">' +
-        '<div class="q-meta"><h2>Live Game</h2><span class="soon">Coming soon</span></div>' +
-        '<p class="muted">Everyone answers on their own phone at the same moment, from anywhere. This turns on once the free hosting and sign-in are set up.</p>' +
-      '</section>' +
+      liveCard() +
       scoringCard() +
-      '<p class="footer-note">Scores and your own questions are saved on this device until shared hosting is set up.</p>';
+      '<p class="footer-note">' + (Store.cloud && Store.user()
+        ? 'Daily scores and custom questions are shared with everyone signed in.'
+        : 'Scores and your own questions are saved on this device.') + '</p>';
+  }
+
+  function signInButton(label) {
+    return '<button class="btn-primary" data-action="sign-in"' + (state.signingIn ? ' disabled' : '') + '>' +
+      (state.signingIn ? 'Opening Google sign-in…' : label) + '</button>';
+  }
+
+  function accountStrip() {
+    if (!Store.cloud) return '';
+    var u = Store.user();
+    if (!u) return '<p class="account small muted">Sign in with Google to join the group leaderboard and live games.</p>';
+    if (state.renaming) {
+      return '<form class="account field-row" data-form="rename">' +
+        '<input type="text" id="rename" maxlength="20" autocomplete="off" value="' + esc(u.name) + '" aria-label="Your name">' +
+        '<button type="submit">Save</button></form>';
+    }
+    return '<div class="account row small"><span>Playing as <strong>' + esc(u.name) + '</strong></span>' +
+      '<button class="btn-ghost btn-small" data-action="rename">Change name</button>' +
+      '<button class="btn-ghost btn-small" data-action="sign-out">Sign out</button></div>';
+  }
+
+  function liveCard() {
+    if (!Store.cloud) {
+      return '<section class="card mode-soon">' +
+        '<div class="q-meta"><h2>Live Game</h2><span class="soon">Online version</span></div>' +
+        '<p class="muted">Everyone answers on their own phone at the same moment, from anywhere. ' +
+          'Live games run on the online version of Squad Trivia, with Google sign-in: ' +
+          '<a href="https://humanvue.github.io/Humanvue/">humanvue.github.io/Humanvue</a></p>' +
+      '</section>';
+    }
+    var body;
+    if (!Store.user()) {
+      body = signInButton('Sign in with Google to play live');
+    } else {
+      body = '<p class="muted">Host a game and share the 4-letter code, or join a friend\'s game. ' +
+          LIVE_QUESTIONS + ' questions from the categories picked under Pass &amp; Play, ' + (state.setup.timer || 20) + ' seconds each.</p>' +
+        '<button class="btn-primary" data-action="live-host"' + (state.liveBusy ? ' disabled' : '') + '>Host a live game</button>' +
+        '<form class="field-row" data-form="live-join">' +
+          '<input type="text" id="live-code" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="Game code" aria-label="Game code">' +
+          '<button type="submit"' + (state.liveBusy ? ' disabled' : '') + '>Join</button>' +
+        '</form>';
+    }
+    return '<section class="card"><h2>Live Game</h2>' + body +
+      (state.liveError ? '<p class="error">' + esc(state.liveError) + '</p>' : '') + '</section>';
   }
 
   function scoringCard() {
@@ -414,8 +482,8 @@
   function aggregate() {
     var byName = {};
     state.dailyResults.forEach(function (r) {
-      var key = r.player.trim().toLowerCase();
-      var row = byName[key] || (byName[key] = { name: r.player, points: 0, days: 0, correct: 0, total: 0, best: 0 });
+      var key = playerKey(r);
+      var row = byName[key] || (byName[key] = { name: r.player, mine: isMe(r), points: 0, days: 0, correct: 0, total: 0, best: 0 });
       row.points += r.score;
       row.days += 1;
       row.correct += r.correct;
@@ -435,7 +503,7 @@
         .sort(function (a, b) { return b.score - a.score || b.correct - a.correct; });
       body = rows.length
         ? '<div class="board">' + rows.map(function (r, i) {
-            return '<div class="board-row' + (sameName(r.player, state.profileName) ? ' current' : '') + '">' +
+            return '<div class="board-row' + (isMe(r) ? ' current' : '') + '">' +
               '<span class="rank">' + (i + 1) + '</span>' +
               '<span class="name">' + esc(r.player) + ' <span class="sub">' + r.correct + '/' + r.total + '</span>' +
               '<span class="dots">' + r.pattern.map(function (hit) { return '<i class="' + (hit ? 'hit' : 'miss') + '"></i>'; }).join('') + '</span></span>' +
@@ -446,7 +514,7 @@
       var all = aggregate();
       body = all.length
         ? '<div class="board">' + all.map(function (r, i) {
-            return '<div class="board-row' + (sameName(r.name, state.profileName) ? ' current' : '') + '">' +
+            return '<div class="board-row' + (r.mine ? ' current' : '') + '">' +
               '<span class="rank">' + (i + 1) + '</span>' +
               '<span class="name">' + esc(r.name) + ' <span class="sub">' + r.days + ' day' + (r.days === 1 ? '' : 's') +
               ' · ' + Math.round(r.correct / r.total * 100) + '% right · best ' + r.best + '</span></span>' +
@@ -462,7 +530,7 @@
           '<button data-action="board-tab" data-value="all" aria-pressed="' + (tab === 'all') + '">All time</button>' +
         '</div>' + body +
         '<p class="small muted">Daily Challenge points only, since everyone gets the same questions. ' +
-          'For now this lists people who played on this device. Once shared hosting is on, it shows the whole group.</p>' +
+          (Store.cloud && Store.user() ? 'Everyone signed in shows up here.' : 'This lists people who played on this device.') + '</p>' +
       '</section>';
   }
 
@@ -713,8 +781,283 @@
       '<section class="card"><h2>Your questions (' + state.custom.length + ')</h2>' + list + '</section>';
   }
 
+  // ---------- live game ----------
+
+  var LIVE_QUESTIONS = 10;
+  var liveStop = null;
+  var liveTimer = null;
+
+  function myUid() {
+    var u = Store.user();
+    return u ? u.uid : null;
+  }
+
+  function liveReset() {
+    if (liveStop) liveStop();
+    if (liveTimer) clearInterval(liveTimer);
+    liveStop = null;
+    liveTimer = null;
+    state.live = null;
+  }
+
+  function liveFail(e) {
+    state.liveBusy = false;
+    state.liveError = (e && e.message) || 'Could not reach the game. Check your connection and try again.';
+    render();
+  }
+
+  function hostLive() {
+    var cats = state.setup.categories;
+    if (!cats.length) { state.liveError = 'Pick at least one category under Pass & Play first.'; return render(); }
+    var pool = shuffle(allQuestions().filter(function (q) { return cats.indexOf(q.category) !== -1; }));
+    var questions = pool.slice(0, LIVE_QUESTIONS).map(function (q) {
+      return { q: q, options: shuffle([q.answer].concat(q.wrong)) };
+    });
+    state.liveError = '';
+    state.liveBusy = true;
+    render();
+    Store.live.create(questions, state.setup.timer || 20, Daily.build(Daily.today()).featured).then(enterLive, liveFail);
+  }
+
+  function joinLive(code) {
+    code = (code || '').trim().toUpperCase();
+    if (!/^[A-Z]{4}$/.test(code)) { state.liveError = 'Enter the 4-letter code from the host.'; return render(); }
+    state.liveError = '';
+    state.liveBusy = true;
+    render();
+    Store.live.join(code).then(enterLive, liveFail);
+  }
+
+  function enterLive(code) {
+    state.liveBusy = false;
+    go('live');
+    state.live = { code: code, snap: null, seenIndex: -1, deadline: 0, picks: {}, revealing: -1, error: '' };
+    liveStop = Store.live.watch(code, onLive, function () {
+      if (state.live) state.live.error = 'Lost connection to the game. Check your signal.';
+      render();
+    });
+  }
+
+  function onLive(snap) {
+    var L = state.live;
+    if (!L) return;
+    L.snap = snap;
+    var g = snap.game;
+    if (g.status === 'question' && g.index !== L.seenIndex) {
+      L.seenIndex = g.index;
+      L.deadline = Date.now() + g.timer * 1000;
+      if (liveTimer) clearInterval(liveTimer);
+      liveTimer = setInterval(liveTick, 200);
+    }
+    if (g.status !== 'question' && liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+    maybeReveal();
+    if (state.screen === 'live') render();
+  }
+
+  function myAnswer(index) {
+    var L = state.live;
+    if (L.picks.hasOwnProperty(index)) return { choice: L.picks[index] };
+    var uid = myUid();
+    for (var i = 0; i < L.snap.answers.length; i++) {
+      var a = L.snap.answers[i];
+      if (a.index === index && a.uid === uid) return a;
+    }
+    return null;
+  }
+
+  function livePlayers() {
+    return state.live.snap.players.slice().sort(function (a, b) { return b.score - a.score || b.correct - a.correct; });
+  }
+
+  function liveTick() {
+    var L = state.live;
+    if (!L || !L.snap) return;
+    var g = L.snap.game;
+    var left = Math.max(0, L.deadline - Date.now());
+    var fill = document.getElementById('timer-fill');
+    var text = document.getElementById('timer-text');
+    if (fill) {
+      fill.style.width = (left / (g.timer * 1000) * 100) + '%';
+      fill.classList.toggle('low', left < 5000);
+    }
+    if (text) text.textContent = Math.ceil(left / 1000) + 's';
+    if (left <= 0 && g.status === 'question' && !myAnswer(g.index)) liveAnswer(null);
+    maybeReveal();
+  }
+
+  // The host's phone moves everyone to the answer once all have answered or time is up.
+  function maybeReveal() {
+    var L = state.live;
+    var g = L.snap.game;
+    if (g.host !== myUid() || g.status !== 'question' || L.revealing === g.index) return;
+    var count = L.snap.answers.filter(function (a) { return a.index === g.index; }).length;
+    if (count >= L.snap.players.length || Date.now() > L.deadline + 1500) {
+      L.revealing = g.index;
+      Store.live.setStatus(L.code, 'reveal');
+    }
+  }
+
+  function liveAnswer(choice) {
+    var L = state.live;
+    var g = L.snap.game;
+    var i = g.index;
+    if (g.status !== 'question' || myAnswer(i)) return;
+    L.picks[i] = choice;
+    var item = g.questions[i];
+    var uid = myUid();
+    var mine = L.snap.players.filter(function (p) { return p.uid === uid; })[0] ||
+      { score: 0, correct: 0, answered: 0, streak: 0, bestStreak: 0 };
+    var right = choice !== null && item.options[choice] === item.answer;
+    var timeLeft = Math.max(0, L.deadline - Date.now()) / (g.timer * 1000);
+    var sc = right ? Scoring.score(item.difficulty, timeLeft, mine.streak + 1, item.category === g.featured) : null;
+    var streak = right ? mine.streak + 1 : 0;
+    L.lastScore = sc;
+    Store.live.answer(L.code, i, choice, sc ? sc.total : 0, {
+      score: mine.score + (sc ? sc.total : 0),
+      correct: mine.correct + (right ? 1 : 0),
+      answered: mine.answered + 1,
+      streak: streak,
+      bestStreak: Math.max(mine.bestStreak, streak)
+    }).catch(function () {
+      L.error = 'Your answer did not save. Check your connection.';
+      render();
+    });
+    render();
+  }
+
+  function liveAdvance() {
+    var L = state.live;
+    var g = L.snap.game;
+    if (g.status === 'lobby') return Store.live.setStatus(L.code, 'question', 0);
+    if (g.index + 1 < g.questions.length) return Store.live.setStatus(L.code, 'question', g.index + 1);
+    return Store.live.setStatus(L.code, 'done');
+  }
+
+  function liveBoard(roundIndex) {
+    var uid = myUid();
+    var answers = state.live.snap.answers;
+    return '<div class="board">' + livePlayers().map(function (p, i) {
+      var round = '';
+      if (typeof roundIndex === 'number') {
+        var a = answers.filter(function (x) { return x.index === roundIndex && x.uid === p.uid; })[0];
+        round = a ? (a.points ? '<span class="round good">+' + a.points + '</span>' : '<span class="round bad">miss</span>')
+          : '<span class="round">no answer</span>';
+      }
+      return '<div class="board-row' + (p.uid === uid ? ' current' : '') + '">' +
+        '<span class="rank">' + (i + 1) + '</span>' +
+        '<span class="name">' + esc(p.name) + ' <span class="sub">' + p.correct + '/' + p.answered + '</span> ' + round + '</span>' +
+        '<span class="score">' + p.score + '</span></div>';
+    }).join('') + '</div>';
+  }
+
+  function liveHeader(g, item) {
+    var d = item.difficulty || 2;
+    var uid = myUid();
+    var mine = state.live.snap.players.filter(function (p) { return p.uid === uid; })[0];
+    var nextX = Scoring.streakMultiplier((mine ? mine.streak : 0) + 1);
+    var tags = '<span class="tag diff-' + d + '">' + Scoring.LABEL[d] + ' · ' + Scoring.BASE[d] + '</span>' +
+      (item.category === g.featured ? '<span class="tag tag-featured">Category of the day ×' + Scoring.FEATURED_BONUS + '</span>' : '') +
+      (nextX > 1 && g.status === 'question' ? '<span class="tag tag-streak">Streak ×' + nextX + '</span>' : '');
+    return '<div class="q-meta"><span class="cat-badge">' + esc(catName(item.category)) + (item.custom ? ' · Custom' : '') + '</span>' +
+      '<span class="progress">Game ' + esc(state.live.code) + ' · Q ' + (g.index + 1) + ' of ' + g.questions.length + '</span></div>' +
+      '<div class="tags">' + tags + '</div>' +
+      '<p class="q-text">' + esc(item.q) + '</p>';
+  }
+
+  function viewLive() {
+    var L = state.live;
+    var leave = '<button class="btn-ghost btn-small" data-action="home">Leave game</button>';
+    if (!L || !L.snap) {
+      return topbar(leave) + '<section class="card"><h2>Connecting to game ' + esc(L ? L.code : '') + '…</h2>' +
+        (L && L.error ? '<p class="error">' + esc(L.error) + '</p>' : '') + '</section>';
+    }
+    var g = L.snap.game;
+    var isHost = g.host === myUid();
+    var err = L.error ? '<p class="error">' + esc(L.error) + '</p>' : '';
+
+    if (g.status === 'lobby') {
+      return topbar(leave) +
+        '<section class="card handoff">' +
+          '<p class="label">Game code</p>' +
+          '<p class="who code">' + esc(L.code) + '</p>' +
+          '<p class="muted">Friends open Squad Trivia, sign in, and enter this code under Live Game.</p>' +
+          (isHost
+            ? '<button class="btn-primary" data-action="live-next">Start with ' + L.snap.players.length + ' player' + (L.snap.players.length === 1 ? '' : 's') + '</button>'
+            : '<p class="progress">Waiting for ' + esc(g.hostName) + ' to start</p>') + err +
+        '</section>' +
+        '<section class="card"><h2>In the lobby</h2>' + liveBoard() + '</section>';
+    }
+
+    if (g.status === 'done') {
+      var order = livePlayers();
+      var top = order[0];
+      return topbar('') +
+        '<section class="card winner">' +
+          '<p class="crown">' + (order.length > 1 ? 'Winner' : 'Final score') + '</p>' +
+          '<h1>' + esc(top ? top.name : '') + '</h1>' +
+          '<div class="stat-grid" style="width:100%">' +
+            '<div class="stat"><div class="v">' + (top ? top.score : 0) + '</div><div class="k">points</div></div>' +
+            '<div class="stat"><div class="v">' + (top ? top.correct : 0) + '/' + g.questions.length + '</div><div class="k">correct</div></div>' +
+            '<div class="stat"><div class="v">' + (top ? top.bestStreak : 0) + '</div><div class="k">best streak</div></div>' +
+          '</div>' +
+        '</section>' +
+        '<section class="card"><h2>Final standings</h2>' + liveBoard() +
+          '<button class="btn-primary" data-action="home">Back to home</button></section>';
+    }
+
+    var item = g.questions[g.index];
+    var mine = myAnswer(g.index);
+    var reveal = g.status === 'reveal';
+    var answers = '<div class="answers">' + item.options.map(function (opt, i) {
+      var cls = 'answer';
+      var mark = '';
+      if (reveal) {
+        if (opt === item.answer) { cls += ' correct'; mark = 'Correct'; }
+        else if (mine && mine.choice === i) { cls += ' wrong'; mark = 'Your pick'; }
+        else cls += ' dim';
+      } else if (mine) {
+        cls += mine.choice === i ? ' picked' : ' dim';
+        if (mine.choice === i) mark = 'Locked in';
+      }
+      return '<button class="' + cls + '" data-action="live-answer" data-index="' + i + '"' + (reveal || mine ? ' disabled' : '') + '>' +
+        '<span class="key">' + KEYS[i] + '</span><span class="text">' + esc(opt) + '</span>' +
+        (mark ? '<span class="mark">' + mark + '</span>' : '') + '</button>';
+    }).join('') + '</div>';
+
+    var answeredCount = L.snap.answers.filter(function (a) { return a.index === g.index; }).length;
+
+    if (!reveal) {
+      var left = Math.max(0, L.deadline - Date.now());
+      var timer = '<div class="timer" aria-label="Time left"><div class="timer-track"><div class="timer-fill" id="timer-fill" style="width:' +
+        (left / (g.timer * 1000) * 100) + '%"></div></div><span class="timer-text" id="timer-text">' + Math.ceil(left / 1000) + 's</span></div>';
+      return topbar(leave) +
+        '<section class="card question-card" data-cat="' + item.category + '">' +
+          liveHeader(g, item) + timer + answers +
+          '<p class="progress">' + answeredCount + ' of ' + L.snap.players.length + ' answered' +
+            (mine ? '. Waiting for the rest.' : '') + '</p>' + err +
+        '</section>';
+    }
+
+    var mineRow = L.snap.answers.filter(function (a) { return a.index === g.index && a.uid === myUid(); })[0];
+    var pts = mineRow ? mineRow.points : 0;
+    var verdict = pts
+      ? '<div class="verdict good"><strong>Correct</strong><span class="pts">+' + pts + '</span>' +
+          (L.lastScore ? breakdown(L.lastScore) : '') + '</div>'
+      : '<div class="verdict bad"><strong>' + (mine && mine.choice !== null ? 'Not quite' : 'Time\'s up') + '</strong><span>Answer: ' + esc(item.answer) + '</span></div>';
+    var last = g.index + 1 >= g.questions.length;
+    return topbar(leave) +
+      '<section class="card question-card" data-cat="' + item.category + '">' +
+        liveHeader(g, item) + verdict + answers +
+        (isHost
+          ? '<button class="btn-primary" data-action="live-next">' + (last ? 'Show final scores' : 'Next question') + '</button>'
+          : '<p class="progress">Waiting for ' + esc(g.hostName) + ' to go on</p>') + err +
+      '</section>' +
+      '<section class="card"><h2>Scoreboard</h2>' + liveBoard(g.index) + '</section>';
+  }
+
   var VIEWS = {
     home: viewHome,
+    live: viewLive,
     board: viewBoard,
     'daily-result': viewDailyResult,
     setup: viewSetup,
@@ -798,6 +1141,35 @@
       case 'board':
         go('board');
         break;
+      case 'sign-in':
+        state.signingIn = true;
+        render();
+        Store.signIn().catch(function () {
+          state.liveError = 'Google sign-in did not finish. Try again.';
+        }).then(function () { state.signingIn = false; render(); });
+        break;
+      case 'sign-out':
+        Store.signOut();
+        break;
+      case 'rename':
+        state.renaming = true;
+        render();
+        var r = document.getElementById('rename');
+        if (r) r.focus();
+        break;
+      case 'daily-cloud':
+        startDaily(Store.user() ? Store.user().name : '');
+        break;
+      case 'live-host':
+        hostLive();
+        break;
+      case 'live-answer':
+        liveAnswer(Number(el.getAttribute('data-index')));
+        break;
+      case 'live-next':
+        el.disabled = true;
+        liveAdvance();
+        break;
       case 'board-tab':
         state.boardTab = el.getAttribute('data-value');
         render();
@@ -865,6 +1237,20 @@
       if (again && !again.disabled) again.focus();
     }
 
+    if (form === 'rename') {
+      var newName = document.getElementById('rename').value.trim();
+      state.renaming = false;
+      if (newName) {
+        state.profileName = newName;
+        Store.saveProfile({ name: newName }).then(render);
+      }
+      render();
+    }
+
+    if (form === 'live-join') {
+      joinLive(document.getElementById('live-code').value);
+    }
+
     if (form === 'daily') {
       startDaily(document.getElementById('daily-name').value);
     }
@@ -899,20 +1285,34 @@
   });
 
   document.addEventListener('keydown', function (e) {
-    if (state.screen !== 'question' || e.metaKey || e.ctrlKey || e.altKey) return;
+    var live = state.screen === 'live' && state.live && state.live.snap && state.live.snap.game.status === 'question';
+    if ((state.screen !== 'question' && !live) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
     var k = e.key.toUpperCase();
     var i = KEYS.indexOf(k);
     if (i === -1 && k >= '1' && k <= '4') i = Number(k) - 1;
-    if (i !== -1) { e.preventDefault(); answer(i); }
+    if (i !== -1) { e.preventDefault(); if (live) liveAnswer(i); else answer(i); }
   });
 
   // ---------- boot ----------
 
+  function loadShared() {
+    return Promise.all([
+      loadCustom(),
+      loadDaily(),
+      Store.getProfile().then(function (p) { state.profileName = (p && p.name) || ''; })
+    ]);
+  }
+
+  // Signing in or out swaps which scores and questions are shown.
+  Store.onAuth(function () {
+    state.renaming = false;
+    loadShared().then(render, render);
+  });
+
   Promise.all([
-    loadCustom(),
+    Store.ready.then(loadShared),
     loadHistory(),
-    loadDaily(),
-    Store.getProfile().then(function (p) { state.profileName = (p && p.name) || ''; }),
     Store.getLastSetup().then(function (saved) {
       if (saved && Array.isArray(saved.players)) {
         state.setup.players = saved.players.slice(0, MAX_PLAYERS);

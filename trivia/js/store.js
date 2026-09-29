@@ -38,6 +38,15 @@
   window.TriviaStore = {
     backend: 'this browser',
 
+    // Sign-in and live games exist only when js/cloud.js connects Firebase.
+    cloud: false,
+    ready: Promise.resolve(),
+    live: null,
+    user: function () { return null; },
+    onAuth: function () {},
+    signIn: function () { return Promise.reject(new Error('Sign-in needs the online version.')); },
+    signOut: function () { return Promise.resolve(); },
+
     listCustomQuestions: function () {
       return Promise.resolve(read(KEYS.custom, []));
     },

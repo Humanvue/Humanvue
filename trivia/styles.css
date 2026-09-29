@@ -565,3 +565,18 @@ input[type="text"], select, textarea {
 .dots { display: flex; gap: 3px; margin-top: 4px; }
 .dots i { width: 8px; height: 8px; border-radius: 2px; background: var(--bad); }
 .dots i.hit { background: var(--good); }
+
+/* Online account strip */
+.account { padding-inline: 4px; gap: 4px; }
+.account > span { margin-right: auto; }
+.account button.btn-ghost { border: none; padding: 4px 6px; color: var(--brass); text-decoration: underline; }
+.account strong { color: var(--ink); }
+
+/* Live game */
+.who.code { font-family: var(--mono); letter-spacing: 0.2em; }
+.answer.picked { border-color: var(--brass); background: color-mix(in srgb, var(--brass) 14%, var(--surface)); }
+.answer.picked .key { background: var(--brass); color: var(--brass-ink); }
+.round { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); font-weight: 700; }
+.round.good { color: var(--good); }
+.round.bad { color: var(--bad); }
+a { color: var(--brass); }
