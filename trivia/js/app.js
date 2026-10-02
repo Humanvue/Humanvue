@@ -31,6 +31,7 @@
     profileName: '',
     boardTab: 'today',
     crown: null,
+    champ: null,
     tallies: {},
     trophyKey: null,
     theme: readTheme(),
@@ -428,7 +429,7 @@
   }
 
   function loadDaily() {
-    return Store.listDailyResults().then(function (all) { state.dailyResults = all; state.crown = crownHolder(); });
+    return Store.listDailyResults().then(function (all) { state.dailyResults = all; state.crown = crownHolder(); state.champ = champHolder(); });
   }
 
   function loadCustom() {
@@ -658,17 +659,57 @@
     return top ? Object.assign({ from: from }, top) : null;
   }
 
+  // Seasons are calendar months. Last month's top scorer is the reigning champion.
+  function monthStart(date) {
+    return date.slice(0, 8) + '01';
+  }
+
+  function monthEnd(date) {
+    var p = date.split('-').map(Number);
+    return Daily.today(new Date(p[0], p[1], 0));
+  }
+
+  function monthName(date) {
+    var p = date.split('-').map(Number);
+    return new Date(p[0], p[1] - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  }
+
+  function champHolder() {
+    var from = monthStart(addDays(monthStart(Daily.today()), -1));
+    var top = aggregate(from, monthEnd(from))[0];
+    return top ? Object.assign({ from: from }, top) : null;
+  }
+
+  // Every finished week and month, newest first, with its winner.
+  function hallOfFame() {
+    var dates = state.dailyResults.map(function (r) { return r.date; }).sort();
+    var weeks = [], months = [];
+    if (!dates.length) return { weeks: weeks, months: months };
+    var today = Daily.today();
+    for (var w = weekStart(dates[0]); addDays(w, 6) < today; w = addDays(w, 7)) {
+      var wt = aggregate(w, addDays(w, 6))[0];
+      if (wt) weeks.unshift(Object.assign({ from: w }, wt));
+    }
+    for (var m = monthStart(dates[0]); monthEnd(m) < today; m = addDays(monthEnd(m), 1)) {
+      var mt = aggregate(m, monthEnd(m))[0];
+      if (mt) months.unshift(Object.assign({ from: m }, mt));
+    }
+    return { weeks: weeks, months: months };
+  }
+
   // Players, results and board authors all carry a uid online or a name on a device.
-  function hasCrown(p) {
-    var c = state.crown;
+  function holds(c, p) {
     if (!c || !p) return false;
     var keys = [p.uid, p.key, p.name && p.name.trim().toLowerCase()].filter(Boolean)
       .map(function (k) { return String(k).replace(/^(uid|name):/, ''); });
     return keys.indexOf(c.key) !== -1;
   }
 
+  function hasCrown(p) { return holds(state.crown, p); }
+  function hasChamp(p) { return holds(state.champ, p); }
+
   function crownOpts(p) {
-    return { crown: hasCrown(p) };
+    return { crown: hasCrown(p), champ: hasChamp(p) };
   }
 
   function myCrownOpts() {
@@ -676,13 +717,45 @@
     return crownOpts(u ? { uid: u.uid } : { name: state.profileName || '' });
   }
 
+  function holderAvatar(c, size) {
+    var p = (state.players || []).filter(function (x) { return holds(c, x); })[0];
+    return Avatar.svg(p ? avatarFor(p) : Avatar.forName(c.name), size, c.name, crownOpts(p || { key: c.key }));
+  }
+
   function crownNote() {
     var c = state.crown;
     if (!c) return '';
-    var p = (state.players || []).filter(hasCrown)[0];
-    return '<div class="notice crown-note">' + Avatar.svg(p ? avatarFor(p) : Avatar.forName(c.name), 40, c.name, { crown: true }) +
+    return '<div class="notice crown-note">' + holderAvatar(c, 40) +
       '<span><strong>' + esc(c.name) + '</strong> wears the crown this week for scoring ' + c.points +
       ' in the week of ' + shortDate(c.from) + '.</span></div>';
+  }
+
+  function champNote() {
+    var c = state.champ;
+    if (!c) return '';
+    return '<div class="notice crown-note">' + holderAvatar(c, 40) +
+      '<span><strong>' + esc(c.name) + '</strong> is the reigning champion after winning the ' + esc(monthName(c.from)) +
+      ' season with ' + c.points + '.</span></div>';
+  }
+
+  function viewHall() {
+    var h = hallOfFame();
+    function rows(list, label, icon) {
+      return list.length
+        ? '<div class="list">' + list.map(function (r) {
+            return '<div class="list-item hall-row">' + holderAvatar(r, 40) +
+              '<div class="main"><p><strong>' + esc(r.name) + '</strong> ' + icon + '</p>' +
+              '<p class="small muted">' + esc(label(r.from)) + ' · ' + r.points + ' points · ' + r.days + ' day' + (r.days === 1 ? '' : 's') + ' played</p></div></div>';
+          }).join('') + '</div>'
+        : '';
+    }
+    return topbar('<button class="btn-small" data-action="board">Leaderboard</button>') +
+      '<section class="card"><h1>Hall of Fame</h1>' +
+        '<p class="muted">Every season champion and weekly crown, newest first.</p></section>' +
+      '<section class="card"><h2>Season champions \uD83C\uDFC6</h2>' +
+        (rows(h.months, monthName, '\uD83C\uDFC6') || '<p class="muted">The first champion is crowned when this month ends.</p>') + '</section>' +
+      '<section class="card"><h2>Weekly crowns \uD83D\uDC51</h2>' +
+        (rows(h.weeks, function (d) { return 'Week of ' + shortDate(d); }, '\uD83D\uDC51') || '<p class="muted">The first crown goes out after Sunday.</p>') + '</section>';
   }
 
   function viewBoard() {
@@ -713,6 +786,18 @@
           }).join('') + '</div>'
         : '<p class="muted">Nobody has played this week yet.</p>') +
         '<p class="small muted">Week of ' + shortDate(from) + '. The leader on Sunday night takes the crown for next week.</p>';
+    } else if (tab === 'season') {
+      var ms = monthStart(date);
+      var season = aggregate(ms, monthEnd(ms));
+      body = (season.length
+        ? '<div class="board">' + season.map(function (r, i) {
+            return '<div class="board-row' + (r.mine ? ' current' : '') + '">' +
+              '<span class="rank">' + (i === 0 ? '\uD83C\uDFC6' : i + 1) + '</span>' +
+              '<span class="name">' + esc(r.name) + ' <span class="sub">' + r.days + ' day' + (r.days === 1 ? '' : 's') + ' · best ' + r.best + '</span></span>' +
+              '<span class="score">' + r.points + '</span></div>';
+          }).join('') + '</div>'
+        : '<p class="muted">Nobody has played this season yet.</p>') +
+        '<p class="small muted">' + esc(monthName(ms)) + ' season. Everyone starts at zero on the 1st, and the leader when the month ends becomes champion.</p>';
     } else {
       var all = aggregate();
       body = all.length
@@ -730,11 +815,13 @@
         '<div class="q-meta"><h1>Leaderboard</h1><span class="progress">Daily #' + Daily.number(date) + '</span></div>' +
         '<div class="seg" role="tablist">' +
           '<button data-action="board-tab" data-value="today" aria-pressed="' + (tab === 'today') + '">Today</button>' +
-          '<button data-action="board-tab" data-value="week" aria-pressed="' + (tab === 'week') + '">This week</button>' +
+          '<button data-action="board-tab" data-value="week" aria-pressed="' + (tab === 'week') + '">Week</button>' +
+          '<button data-action="board-tab" data-value="season" aria-pressed="' + (tab === 'season') + '">Season</button>' +
           '<button data-action="board-tab" data-value="all" aria-pressed="' + (tab === 'all') + '">All time</button>' +
-        '</div>' + crownNote() + body +
+        '</div>' + (tab === 'season' ? champNote() : crownNote()) + body +
         '<p class="small muted">Daily Challenge points only, since everyone gets the same questions. ' +
           (Store.cloud && Store.user() ? 'Everyone signed in shows up here.' : 'This lists people who played on this device.') + '</p>' +
+        '<button data-action="hall">Hall of Fame</button>' +
       '</section>';
   }
 
@@ -1655,6 +1742,7 @@
     home: viewHome,
     live: viewLive,
     board: viewBoard,
+    hall: viewHall,
     trophies: viewTrophies,
     avatar: viewAvatar,
     players: viewPlayers,
@@ -1750,7 +1838,11 @@
         break;
       case 'board':
         go('board');
-        if (state.crown && !state.players) loadPlayers().then(render);
+        if ((state.crown || state.champ) && !state.players) loadPlayers().then(render);
+        break;
+      case 'hall':
+        go('hall');
+        if (!state.players) loadPlayers().then(render);
         break;
       case 'share-app':
         state.inviteNote = '';

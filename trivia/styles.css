@@ -753,3 +753,4 @@ a { color: var(--brass); }
 .qr-small { width: min(160px, 100%); }
 .share-url { font-family: var(--mono); font-weight: 700; overflow-wrap: anywhere; }
 .share-card .stack { width: 100%; }
+.hall-row { justify-content: flex-start; align-items: center; }

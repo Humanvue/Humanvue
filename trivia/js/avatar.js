@@ -213,9 +213,11 @@
   var uid = 0;
 
   // The background comes from the page's category tokens so it follows the theme.
-  // opts.crown adds the weekly crown badge in the top-left corner.
+  // opts.crown adds the weekly crown badge in the top-left corner and
+  // opts.champ the season champion's trophy in the top-right.
   function svg(a, size, label, opts) {
     var crown = !!(opts && opts.crown);
+    var champ = !!(opts && opts.champ);
     a = normalize(a);
     var s = size || 64;
     var id = 'av' + (++uid);
@@ -223,7 +225,7 @@
     var item = ITEM_BY_ID[a.item];
     var name = label ? String(label).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') : '';
     return '<svg class="avatar" data-cat="' + a.bg + '" width="' + s + '" height="' + s + '" viewBox="0 0 120 120" role="img" aria-label="' +
-      (name ? name + '\'s avatar' : 'Avatar') + (a.body !== 'person' ? ', a ' + ITEM_BY_ID[a.body].name.toLowerCase() + ' with a face' : '') + (item && item.emoji ? ', holding a ' + item.name.toLowerCase() : '') + (crown ? ', wearing the weekly crown' : '') + '">' +
+      (name ? name + '\'s avatar' : 'Avatar') + (a.body !== 'person' ? ', a ' + ITEM_BY_ID[a.body].name.toLowerCase() + ' with a face' : '') + (item && item.emoji ? ', holding a ' + item.name.toLowerCase() : '') + (crown ? ', wearing the weekly crown' : '') + (champ ? ', reigning season champion' : '') + '">' +
       '<defs>' +
         '<clipPath id="' + id + '-clip"><circle cx="60" cy="60" r="60"/></clipPath>' +
         '<radialGradient id="' + id + '-face" cx="45%" cy="40%" r="65%"><stop offset="0" stop-color="' + shade(skin, 0.1) + '"/><stop offset="0.7" stop-color="' + skin + '"/><stop offset="1" stop-color="' + shade(skin, -0.18) + '"/></radialGradient>' +
@@ -266,6 +268,9 @@
         : '') +
       (crown
         ? '<circle cx="20" cy="20" r="18" class="avatar-crown-bg"/><text x="20" y="21" text-anchor="middle" dominant-baseline="central" font-size="21">\uD83D\uDC51</text>'
+        : '') +
+      (champ
+        ? '<circle cx="100" cy="20" r="18" class="avatar-crown-bg"/><text x="100" y="21" text-anchor="middle" dominant-baseline="central" font-size="21">\uD83C\uDFC6</text>'
         : '') +
       '</svg>';
   }

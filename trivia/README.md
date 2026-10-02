@@ -12,7 +12,9 @@ Pass-and-play trivia for a group of friends on one phone or laptop.
 - Avatars: a shaded head-and-shoulders portrait you build (skin, eyes, hair, expression, headwear, shirt, background, glasses, and one of 55 objects to hold). You can also be one of those objects instead of a person, still with a face, hair, glasses and a hat and show off up to three unlocked rewards.
 - Players: everyone's avatar and trophies, plus a category-strength chart (right answers and accuracy per category).
 - Trash talk (online only): one public board for the whole group with @mentions. There are no private messages.
-- Leaderboard: today's Daily Challenge results, this week's totals, and all-time Daily Challenge points.
+- Leaderboard: today's Daily Challenge results, this week's and this season's totals, and all-time Daily Challenge points.
+- Seasons: each calendar month is a season that starts everyone at zero. Last month's winner is the reigning champion and wears a 🏆 on their avatar.
+- Hall of Fame: every past season champion and weekly crown, newest first.
 - Weekly crown: whoever scores the most Daily Challenge points Monday to Sunday wears a 👑 on their avatar all the next week.
 - Add your own questions in the **Question bank**; they join the mix in their category.
 - Recent games are kept as a simple history.
