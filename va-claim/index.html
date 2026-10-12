@@ -352,7 +352,7 @@ function progress(){
 }
 
 /* ---------- Tabs ---------- */
-const TABS=[['dash','Dashboard'],['steps','Steps'],['me','About me'],['conds','Conditions'],['scan','Scan records'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['calc','Calculator'],['debt','Debt plan'],['money','Money charts'],['backup','Backup & help']];
+const TABS=[['dash','Dashboard'],['steps','Steps'],['me','About me'],['conds','Conditions'],['scan','Scan records'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['dates','Deadlines'],['calc','Calculator'],['debt','Debt plan'],['money','Money charts'],['save','Savings & taxes'],['backup','Backup & help']];
 function renderTabs(){
   $('#tabs').innerHTML=TABS.map(([id,n])=>`<button role="tab" id="tab-${id}" aria-selected="${S.tab===id}" data-tab="${id}">${n}</button>`).join('');
 }
@@ -404,6 +404,7 @@ function vDash(){
   return `<div class="stack">
    <div class="panel"><div class="dash-head">${ring}<div class="stack" style="gap:8px">${chip}<h2>${esc(headline)}</h2>
    <dl class="kv"><dt>Steps done</dt><dd>${p.tasksDone} of ${TASKS.length}</dd><dt>Evidence points</dt><dd>${p.condPts} of ${p.condMax}</dd><dt>Documents marked final</dt><dd>${docsDone}</dd>${(()=>{const R=calcResult();return R.rows.some(r=>+r.pct>0)?`<dt>Estimated rating</dt><dd><button class="link" data-tab="calc">${R.rounded}% · ${money(R.pay)} a month</button></dd>`:''})()}${S.plan?(()=>{const X=planResult(calcResult());return `<dt>Retired take-home</dt><dd><button class="link" data-tab="calc">${money0(X.net)} a month · ${esc(X.O.label)}, ${JOBS[X.V.job].name}, ${CITY[X.V.city]}</button></dd>`;})():''}${S.claim.filed?`<dt>Filed</dt><dd>${fmt(parseDate(S.claim.filed))}</dd>`:''}</dl></div></div>${tl}</div>
+   ${dashDeadlines()}
    <div class="grid2">
     <div class="panel stack"><h3>Up next</h3>${nextHtml}</div>
     <div class="panel stack"><h3>Progress by phase</h3>${phases}<div class="row small muted"><span class="dot duty"></span>Duty-side steps <span class="dot study" style="margin-left:8px"></span>Off-duty steps</div></div>
@@ -693,6 +694,7 @@ function vDocs(){
   const picks=DOCS.map(x=>{const n=x.for==='all'?1:docOptions(x).length;return `<button class="doc-pick" aria-pressed="${x.id===d.id}" data-pick="${x.id}"><span class="form">${x.form}</span><span class="nm">${x.name}</span><span class="st">${x.for==='all'?'One document':n?`${n} to prepare`:'Nothing to prepare yet'}</span></button>`;}).join('');
   const empty=d.for!=='all'&&!opts.length?`<div class="panel muted">${d.for==='wit'?'Add a person under Witnesses first.':d.for==='mh'?'Add a mental health condition first.':'Add a condition first.'}</div>`:'';
   return `<div class="stack"><h2>Documents</h2><p class="muted">Each document is written from what you entered. Edit it here, then copy it into VA.gov, an email, or a Word file. Nothing is sent anywhere.</p>
+   <div class="panel row" style="justify-content:space-between;flex-wrap:wrap"><span><b>Claim packet for your VSO.</b> <span class="small muted">One printout with your service, every condition and its evidence, witnesses, exposure, questions to ask, and your drafted documents. Print it or save it as a PDF.</span></span><button class="btn primary" data-print-packet>Print claim packet</button></div>
    <div class="doc-list">${picks}</div>
    ${empty||`<div class="panel stack">
     <div class="row" style="justify-content:space-between"><h3>${esc(d.name)} <span class="mono muted">${esc(d.form)}</span></h3>
@@ -1454,7 +1456,141 @@ function bindCharts(){
 function bindPlan(){bindAsOf();document.querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{planView()[b.dataset.pv]=b.dataset.val;save();render();});
   document.querySelectorAll('[data-poff]').forEach(c=>c.onchange=()=>{const o=offSet();if(c.checked)delete o[c.dataset.poff];else o[c.dataset.poff]=true;save();render();});}
 
-const VIEWS={calc:[vCalc,()=>{bindCalc();bindCharts();}],debt:[vDebt,bindDebt],money:[vMoney,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup]};
+/* ---------- Deadlines: leaving the military (counted from your separation date) and nursing school ---------- */
+const SEP_ITEMS=[ // [id, days from separation, title, what to do]
+ ['tap',-365,'Start TAP','Transition Assistance has to start at least 365 days before you leave (retirees can start 24 months out). It includes the VA benefits briefing, where you can meet a VSO.'],
+ ['bddopen',-180,'BDD window opens','File the VA claim between 180 and 90 days before you leave, with a VSO. Print the claim packet (Documents tab) for the appointment.'],
+ ['strs',-120,'Get a full copy of your medical records','Ask for your complete service treatment records, including dental and behavioral health. Keep your own copy.'],
+ ['sha',-90,'Separation Health Assessment Part A','Needed with a BDD claim. List every symptom, even small ones.'],
+ ['sbp',-90,'Decide on Survivor Benefit Plan (SBP)','Decide before you sign the DD 2656. SBP pays a survivor 55% of the base amount you pick and costs about 6.5% of it. Declining needs your spouse\'s signature if you are married, and the choice is hard to undo.'],
+ ['dd2656',-90,'Turn in DD 2656 (retired pay)','About 90 days out, so retired pay starts on time. Pick your federal tax withholding on it too (see Savings & taxes).'],
+ ['bddclose',-90,'BDD window closes','Last day to file under BDD. A claim VA gets within a year of separation still pays from the day after.'],
+ ['leave',-60,'Plan leave: sell back or take terminal leave','Sell-back is capped at 60 days over a career. Check your LES for days left and how many you have already sold.'],
+ ['les',0,'Keep your final LES, NGB-22 and DD 214','Keep copies for good. VA, a VA hospital job, the VA home loan and the state all ask for them.'],
+ ['id',1,'Get your retiree ID card (DEERS)','Book a RAPIDS appointment. Your family members need new ID cards too.'],
+ ['mypay',30,'Check myPay: retired pay started and tax withholding set','Look at your first retiree account statement. Set federal withholding with a W-4P. Minnesota does not tax military retired pay.'],
+ ['fedvip',60,'Last day to enroll in FEDVIP dental and vision','Enroll at BENEFEDS.com within 60 days.'],
+ ['tricare',90,'Last day to enroll in TRICARE','Within 90 days, on milConnect or with the regional contractor. Missing it leaves you without TRICARE until open season.'],
+ ['sgli',120,'SGLI ends: apply for VGLI','Free SGLI coverage stops 120 days after you leave.'],
+ ['vgli',240,'Last day for VGLI without health questions','After this you can still apply for up to a year and 120 days, but with health questions.'],
+ ['claim',365,'Backstop: file the VA claim by today','A claim VA gets within one year of separation pays back to the day after. If you have not filed yet, submit an intent to file (VA Form 21-0966), which gives one more year.']];
+const SCHOOL_ITEMS=[ // [id, date, title, what to do]
+ ['fafsa','2026-10-15','Submit the 2027–28 FAFSA','Needed for federal loans and the Minnesota State Grant for the DNP year. Some aid runs out, so file early.'],
+ ['tillman','2026-12-01','Check Tillman Scholar dates','For veterans and spouses. It usually opens in winter and closes around late February. Confirm at pattillmanfoundation.org.'],
+ ['hpsp','2027-01-11','Check VA HPSP scholarship for nurse practitioners','The VA Health Professions Scholarship pays tuition and a stipend in return for working at a VA after you finish. Check va.gov for this cycle.'],
+ ['nclexapp','2027-03-01','Apply to the MN Board of Nursing and register for NCLEX','Apply for licensure by exam and register with Pearson VUE 6 to 8 weeks before graduation.'],
+ ['grad','2027-04-30','Graduate BSN (April 2027)','Ask the registrar to send your transcript to the Board of Nursing right away so you get your test date.'],
+ ['dnpapp','2027-05-03','Herzing DNP application for a September 2027 start','Confirm the deadline with your admissions advisor. You need your license or NCLEX date, transcripts and references.'],
+ ['nclex','2027-06-01','Take the NCLEX','Most new grads test within 45 to 60 days of graduating.'],
+ ['mngi','2027-07-01','Apply for the Minnesota GI Bill','Apply each school year through MDVA and the school\'s veterans office.'],
+ ['dnpstart','2027-09-01','DNP classes start','Send the school your GI Bill or VR&E paperwork before the term.'],
+ ['loanfg','2030-07-01','Apply for Minnesota Health Care Loan Forgiveness','Once you work as an NP in an eligible setting (rural, mental health shortage area, or the VA may not count, so check). Applications usually open in the fall.']];
+function sepDate(){return parseDate(S.profile.sep||(S.plan?planView().date:''));}
+function deadlines(){const sep=sepDate(),now=new Date();now.setHours(12,0,0,0);S.dl=S.dl||{};
+  const mk=(id,side,d,t,b)=>({id,side,d,t,b,done:!!S.dl[id],days:Math.round((d-now)/DAY)});
+  const mil=sep?SEP_ITEMS.map(([id,o,t,b])=>mk(id,'duty',new Date(sep.getTime()+o*DAY),t,b)):[];
+  const sch=SCHOOL_ITEMS.map(([id,d,t,b])=>mk(id,'study',parseDate(id==='loanfg'&&S.plan&&S.plan.npStart?S.plan.npStart+'-01':d),t,b));
+  return{sep,mil,sch};}
+function dlRow(x){const st=x.done?'<span class="chip good">Done</span>':x.days<0?`<span class="chip bad">${-x.days} days ago</span>`:x.days===0?'<span class="chip warn">Today</span>':x.days<=60?`<span class="chip warn">In ${x.days} days</span>`:`<span class="chip plain">In ${x.days} days</span>`;
+  return `<label class="task ${x.side} ${x.done?'done':''}"><input type="checkbox" data-dl="${x.id}" ${x.done?'checked':''}><div style="flex:1;min-width:0"><div class="row" style="justify-content:space-between;gap:8px"><span class="t-title">${esc(x.t)}</span><span class="row small" style="gap:6px"><b>${fmt(x.d)}</b>${st}</span></div><div class="small muted">${esc(x.b)}</div></div></label>`;}
+function vDates(){const D=deadlines();
+  return `<div class="stack"><h2>Deadlines</h2><p class="muted">Green is leaving the military, counted from your separation date (About me). Blue is nursing school. They are also on your Google Calendar in the same colors. Check each one off when it is done.</p>
+   <div class="panel stack"><h3><span class="dot duty"></span> Leaving the military${D.sep?` · ${fmt(D.sep)}`:''}</h3>${D.sep?D.mil.map(dlRow).join(''):'<p class="muted">Add your separation date under About me.</p>'}</div>
+   <div class="panel stack"><h3><span class="dot study"></span> Nursing school</h3>${D.sch.map(dlRow).join('')}<p class="small muted">School dates are typical windows. Confirm each one with the school or the program before you count on it.</p></div></div>`;}
+function bindDates(){document.querySelectorAll('[data-dl]').forEach(c=>c.onchange=()=>{S.dl=S.dl||{};S.dl[c.dataset.dl]=c.checked;save();render();});}
+function dashDeadlines(){const D=deadlines(),up=D.mil.concat(D.sch).filter(x=>!x.done).sort((a,b)=>a.d-b.d).slice(0,4);
+  return up.length?`<div class="panel stack"><div class="row" style="justify-content:space-between"><h3>Next deadlines</h3><button class="btn sm" data-tab="dates">All deadlines</button></div><ul class="clean next">${up.map(x=>`<li><span class="dot ${x.side}" style="margin-top:8px;flex:none"></span><div style="flex:1;min-width:0"><div class="t-title">${esc(x.t)}</div><div class="small muted">${fmt(x.d)} · ${x.days<0?`${-x.days} days ago`:`in ${x.days} days`}</div></div></li>`).join('')}</ul></div>`:'';}
+
+/* ---------- Savings and taxes: emergency fund, TSP, and a yearly tax estimate ---------- */
+function svState(){S.sv=Object.assign({cash:'',tsp:'',tspMo:'',months:'3',hist:[]},S.sv||{});return S.sv;}
+function taxYear(R,y){ // income and tax for calendar year y, month by month from the same switches as the Calculator
+  const P=S.plan,O=P.options[planView().date]||P.options[Object.keys(P.options)[0]],agr=P.agrWages||Math.round(O.high3*12),cache={};
+  let wages=0,ret=0,sal=0,ss=0,va=0,agrM=0,jobs=new Set();
+  for(let m=0;m<12;m++){const i=y*12+m,L=lifeAt(i);
+    if(L.agr){wages+=agr/12*L.infl;agrM++;jobs.add('AGR');continue;}
+    const k=[L.job,L.stage,L.sal,Math.round(L.cola*200)].join(),X=cache[k]??=planResult(R,{job:L.job,stage:L.stage,sal:L.sal,yrs:L.yrs,cola:L.cola});
+    ret+=X.ret;va+=X.va;jobs.add(L.stage==='retired'?'Fully retired':'Retired pay + '+L.label.replace(/, year.*/,'')+(planView().emp==='va'?' at the VA':''));
+    const s=X.L.find(l=>l.side==='study'),q=X.L.find(l=>/^Social Security/.test(l.k));if(s)sal+=s.v;if(q)ss+=q.v;}
+  const f=Math.pow(1+INFL,Math.max(0,y-2026)),age=y-+P.born.slice(0,4),std=TAX.fedStd+(age>=65?TAX.fed65:0);
+  const fedInc=wages+ret+sal+ss*.85,fed=bracketTax(Math.max(0,fedInc/f-std),TAX.fed)*f;
+  const mn=bracketTax(Math.max(0,sal/f-TAX.mnStd),TAX.mn)*f; // AGR pay: Minnesota's active-duty military pay subtraction; retired pay, VA pay and (under the limit) Social Security are not taxed
+  const fica=(Math.min(wages+sal,TAX.ssBase*f)*.062+(wages+sal)*.0145);
+  const fedSalOnly=bracketTax(Math.max(0,(sal+wages)/f-std),TAX.fed)*f; // roughly what a job's withholding covers if it is your only income
+  return{y,wages,ret,sal,ss,va,agrM,fedInc,fed,mn,fica,tot:fed+mn+fica,eff:(fed+mn+fica)/Math.max(1,wages+ret+sal+ss),gap:fed-fedSalOnly,jobs:[...jobs].join(', ')};}
+function vSave(){
+  const P=S.plan,V=svState(),R=calcResult();
+  const tile=(lab,big,sub)=>`<div class="tile"><div class="eyebrow-s">${lab}</div><div class="tbig">${big}</div><div class="small muted">${sub}</div></div>`;
+  const card=(t,body,note)=>`<div class="panel stack"><div class="eyebrow-s">${t}</div>${body}${note?`<p class="small">${note}</p>`:''}</div>`;
+  if(!P||!P.budget)return `<div class="panel stack"><h3>Savings & taxes</h3><p class="small muted">Restore your Claim Kit backup (Backup & help) to load your numbers.</p></div>`;
+  const spend=P.budget.nowSpend||nonDebtSpend(),need=spend*(+V.months),cash=+V.cash||0,tsp=+V.tsp||0,have=V.cash!=='',c=k=>`var(--s${k})`;
+  const n0=nowIdx(),rm=ymIdx(planView().date.slice(0,7)),toRet=Math.max(1,rm-n0+1),gap=Math.max(0,need-cash);
+  let out=`<div class="stack"><h2>Savings & taxes</h2>
+   <div class="panel stack"><h3>Your balances</h3><p class="small muted">Type what your savings and TSP show today. Press <b>Log today</b> after each update to build a history.</p>
+   <div class="grid2">${field('sv-cash','Emergency savings (checking + savings you can reach)',V.cash,{k:'cash',type:'number'})}${field('sv-tsp','TSP balance',V.tsp,{k:'tsp',type:'number',hint:'From tsp.gov or your quarterly statement'})}${field('sv-tspMo','TSP contribution each month now',V.tspMo,{k:'tspMo',type:'number',hint:'From your LES'})}</div>
+   <div class="row"><div><div class="eyebrow-s">Emergency fund goal</div>${segBtns(V,'months',[['3','3 months'],['6','6 months']]).replace(/data-pv=/g,'data-sv=')}</div><button class="btn" id="svLog" style="margin-left:auto">Log today</button></div></div>`;
+  out+=`<div class="tiles">${tile('Emergency fund goal',money0(need),`${V.months} months of spending at ${money0(spend)} a month`)}${tile('You have',have?money0(cash):'—',have?`${(cash/spend).toFixed(1)} months covered`:'type your savings above')}${tile('To save each month',have?money0(gap/toRet):'—',`to reach the goal by ${ym(rm)}, when AGR pay stops`)}</div>`;
+  if(have){const pc=Math.min(1,cash/need);out+=`<div class="panel stack"><div class="eyebrow-s">Emergency fund</div><div class="path-bar" role="img" aria-label="${pct0(pc)} of goal"><div class="fill ${pc>=1?'work':'ret'}" style="width:${pc*100}%"></div></div><p class="small">${pc>=1?'Goal reached. Extra savings can go to the highest-rate debt.':`Gap of ${money0(gap)}. Keep this in a high-yield savings account, separate from checking. The Debt plan pays cards faster, so build this first only up to one month of spending, then split.`}</p></div>`;}
+  if(V.hist.length>1){const H=V.hist.slice().sort((a,b)=>a.at<b.at?-1:1),xs=H.map(h=>ymIdx(h.at.slice(0,7)));
+    out+=card('Your balances over time',lineChart('svh',{xs:H.map((_,j)=>j),xlab:j=>H[j]?H[j].at.slice(0,7):'',tiplab:j=>fmt(parseDate(H[j].at)),aria:'Savings and TSP history',series:[{n:'Emergency savings',v:H.map(h=>+h.cash||0),c:c(2)},{n:'TSP',v:H.map(h=>+h.tsp||0),c:c(1)}]}),'');}
+  // TSP projection to age 67
+  const bornI=ymIdx(P.born),endI=bornI+67*12,xs=[],g4=[],g7=[];let b4=tsp,b7=tsp;
+  for(let i=n0;i<=endI;i++){const L=lifeAt(i),add=L.agr?(+V.tspMo||0):planView().emp==='va'&&L.sal&&L.stage!=='retired'?L.sal/12*(VA_PAY.match*2):0;
+    b4=b4*(1+.04/12)+add;b7=b7*(1+.07/12)+add;if((i-n0)%3===0){xs.push(i);g4.push(b4);g7.push(b7);}}
+  const at=k=>xs.findIndex(i=>i>=k),i59=bornI+59*12+6;
+  out+=card('TSP growth to age 67',tsp||V.tspMo?lineChart('tspp',{xs,aria:'TSP balance projection',marks:[{i:xs[at(rm+1)],lab:'Retire AGR',side:'duty'},{i:xs[at(i59)],lab:'Age 59½'}],series:[{n:'7% a year',v:g7,c:c(1),fill:true},{n:'4% a year',v:g4,c:c(3),dash:true}]}):'<p class="small muted">Type your TSP balance and monthly contribution above to see this.</p>',
+    `Adds your monthly contribution until AGR ends${planView().emp==='va'?', then 5% of VA pay plus the VA\'s 5% match':''}. At 59½ you can take money out with no early penalty. Your military and any VA civilian TSP are separate accounts that can be combined later.`);
+  // Taxes
+  const Y0=new Date().getFullYear(),YS=Array.from({length:9},(_,k)=>taxYear(R,Y0+k)),AI=asOfI(),ay=AI===null?null:Math.floor(AI/12);
+  const first=YS.find(t=>t.ret>0&&t.sal>0&&t.agrM===0)||YS.find(t=>t.ret>0&&t.agrM===0);
+  out+=`<h2 style="margin-top:8px">Yearly tax estimate</h2>`;
+  if(first)out+=`<div class="tiles">${tile(`Federal tax ${first.y}`,money0(first.fed),`on ${money0(first.fedInc)} of taxable income`)}${tile('Hold back from retired pay',money0(Math.max(0,first.gap)/12),'a month for federal tax, set with a W-4P on myPay')}${tile('Minnesota on retired pay','$0','Minnesota does not tax military retired pay or VA pay')}</div>
+   <div class="panel stack"><p class="small"><b>Why hold back from retired pay:</b> a nursing job withholds tax as if your salary were your only income. Your retired pay stacks on top and pushes part of the salary into a higher bracket, so without extra withholding you would owe about ${money0(Math.max(0,first.gap))} at tax time in ${first.y}. VA disability pay is never taxed and does not go on your return.</p></div>`;
+  const yrRow=t=>`<tr${t.y===ay?' class="yr"':''}><td>${t.y}<div class="small muted">${esc(t.jobs)}</div></td><td>${money0(t.wages+t.ret+t.sal+t.ss)}</td><td>${money0(t.fed)}</td><td>${money0(t.mn)}</td><td>${money0(t.fica)}</td><td>${money0(t.tot)}</td><td>${pct0(t.eff)}</td></tr>`;
+  out+=card('Taxes by year',vbars(YS.map(t=>({lab:String(t.y),segs:[['Federal',t.fed,c(1)],['Minnesota',t.mn,c(2)],['Social Security and Medicare',t.fica,c(4)]]})),{aria:'Yearly taxes'})+
+   `<div class="tbl-wrap"><table class="mtbl"><thead><tr><th>Year</th><th>Income</th><th>Federal</th><th>Minnesota</th><th>FICA</th><th>Total</th><th>Rate</th></tr></thead><tbody>${YS.map(yrRow).join('')}</tbody></table></div>`,
+   `Income here leaves out VA disability pay (tax free). ${P.agrWages?'':`AGR pay is estimated from your High-3 at about ${money0((P.options[planView().date]||Object.values(P.options)[0]).high3*12)} a year; box 1 of your W-2 has the real number.`} Minnesota likely subtracts AGR pay as active-duty military pay. Single filer, standard deduction, 2026 brackets raised ${INFL*100}% a year. Uses the Calculator's job, employer and retirement date${ay?`, and ${ay} is highlighted from View as of`:''}. Check with a tax preparer; free help is at VITA or Military OneSource MilTax.`);
+  return out+'</div>';}
+function bindSave(){bindCharts();const V=svState();
+  document.querySelectorAll('#main [data-k]').forEach(el=>el.oninput=()=>{V[el.dataset.k]=el.value;save();});
+  document.querySelectorAll('#main [data-k]').forEach(el=>el.onchange=()=>setTimeout(()=>{const a=document.activeElement&&document.activeElement.id;render();const n=a&&document.getElementById(a);if(n)n.focus();}));
+  document.querySelectorAll('[data-sv]').forEach(b=>b.onclick=()=>{V[b.dataset.sv]=b.dataset.val;save();render();});
+  $('#svLog').onclick=()=>{const at=new Date().toISOString().slice(0,10);V.hist=V.hist.filter(h=>h.at!==at).concat([{at,cash:V.cash,tsp:V.tsp}]);save();render();toast('Logged');};}
+
+/* ---------- Printable claim packet for a VSO appointment ---------- */
+function packetHTML(){
+  const P=S.profile,B=bdd(),R=calcResult(),E=S.exposure||{},doc=(id,ref)=>{const k=id+':'+(ref||'');return S.docEdits[k]!=null?S.docEdits[k]:genDoc(id,ref);};
+  const row=(k,v)=>v?`<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`:'';
+  const ok=b=>b?'✔':'—';
+  const qs=['Should I file under BDD now, and are all my conditions on the list?','Will you represent me (VA Form 21-22)? How do I reach you while the claim is open?',
+   'My service includes full-time National Guard AGR duty. How does VA treat it for each condition, and for PACT Act presumptives?','Which conditions need a medical opinion (nexus letter), and who should write it?',
+   'Should any condition be claimed as secondary to another?','Is my evidence for each condition enough, or what is missing?','What should I expect at the C&P exams?',
+   'At 50% I get both retired pay and VA pay (CRDP). Does anything in my claim change that?','Which Minnesota benefits should I apply for (70% property tax exclusion, state GI Bill)?'];
+  const conds=S.conditions.map(c=>{const r=R.rows.find(x=>x.id===c.id)||{};return `<section class="cond"><h3>${esc(c.name||'Untitled')} <small>${c.kind==='mental'?'Mental health':'Physical'}${r.pct?` · estimate ${esc(r.pct)}%`:''}</small></h3><table>
+    ${row('Connection',({direct:'Started during service',secondary:'Secondary to '+(c.secondaryTo||'another condition'),aggravated:'Aggravated by service',presumptive:'Presumptive'})[c.cause]||c.cause)}${row('Started',c.onset)}${row('What happened in service',c.event)}${row('Symptoms now',c.symptoms)}${row('How often',c.frequency)}${row('Worst days',c.worst)}${row('Flare-ups',c.flare)}${row('Effect on work',c.work)}${row('Effect on daily life',c.daily)}${row('Treatment',c.treatment)}${row('Medicines',c.meds)}${row('Diagnosis',c.diagnosis||(c.diagnosed?'Yes':''))}${row('In-service record',c.str)}${row('Medical opinion',({'not needed':'Not needed, clearly in my records',maybe:'Not sure yet',need:'Need one',asked:'Asked a provider',have:'Have one'})[c.nexus]||c.nexus)}${row('Rating notes',r.why)}
+    </table><p class="chk">${READY.map(([n,f])=>`${ok(f(c))} ${n}`).join(' &nbsp; ')}</p></section>`;}).join('');
+  const wits=S.witnesses.map(w=>`<tr><td>${esc(w.name)}</td><td>${esc(w.relation)}</td><td>${esc((w.conds||[]).map(id=>(S.conditions.find(c=>c.id===id)||{}).name).filter(Boolean).join(', '))}</td><td>${esc(w.saw)}</td><td>${esc(w.status)}</td></tr>`).join('');
+  const stmts=S.conditions.map(c=>`<section class="doc"><h3>Personal statement: ${esc(c.name)}</h3><pre>${esc(doc('stmt',c.id))}</pre></section>`).join('');
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Claim packet${P.name?' · '+esc(P.name):''}</title><style>
+   body{font:11pt/1.4 Georgia,serif;color:#111;margin:0;padding:24px;max-width:780px}h1{font-size:20pt;margin:0}h2{font-size:14pt;border-bottom:2px solid #556b2f;padding-bottom:2px;margin-top:22px;break-after:avoid}
+   h3{font-size:12pt;margin:14px 0 4px;break-after:avoid}h3 small{font-weight:400;color:#555}table{border-collapse:collapse;width:100%;font-size:10pt}th,td{border:1px solid #bbb;padding:4px 6px;text-align:left;vertical-align:top}th{width:28%;background:#f3f3ee}
+   .cond{border-left:4px solid #556b2f;padding-left:10px;break-inside:avoid-page}.chk{font-size:9.5pt;color:#333}.note{background:#fff7e0;border:1px solid #e0c060;padding:6px 10px;font-size:10pt}
+   pre{white-space:pre-wrap;font:10pt/1.4 Georgia,serif;margin:0}.doc{break-before:page}ol li{margin-bottom:4px}@media print{body{padding:0}}</style></head><body>
+   <h1>VA disability claim packet</h1><p>${esc(P.name||'')}${P.rank?' · '+esc(P.rank):''}${P.branch?' · '+esc(P.branch):''}${P.component?' · '+esc(P.component):''} · printed ${fmt(new Date())}</p>
+   <p class="note"><b>Draft for review with my VSO.</b> Nothing here has been submitted to VA. No Social Security number is included.</p>
+   <h2>Service</h2><table>${row('Job',P.mos)}${row('Service start',P.entry&&fmt(parseDate(P.entry)))}${row('Separation',P.sep&&fmt(parseDate(P.sep)))}${row('Type',P.sepType)}${B.open?row('BDD window',`${fmt(B.open)} to ${fmt(B.close)}`):''}${S.claim.filed?row('Claim filed',fmt(parseDate(S.claim.filed))):''}${row('Claim number',S.claim.num)}</table>
+   <h2>Conditions (${S.conditions.length}) · estimated combined rating ${R.rounded}%</h2><table><tr><th>Condition</th><td><b>Estimate</b></td></tr>${R.rows.map(r=>`<tr><th>${esc(r.name)}</th><td>${r.pct?esc(r.pct)+'%':'not set'}</td></tr>`).join('')}</table>
+   <p class="chk">The rating is my own estimate from the VA rating schedule. VA decides the real rating.</p>${conds}
+   ${wits?`<h2>Witnesses</h2><table><tr><th>Name</th><th>Relation</th><th>Conditions</th><th>What they saw</th><th>Status</th></tr>${wits}</table>`:''}
+   <h2>Toxic exposure</h2><table>${row('Gulf War / post-9/11 locations',E.gulf==='yes'?(E.gulfWhere||'Yes'):E.gulf)}${row('Burn pits',E.burnpit)}${row('Agent Orange',E.agentOrange)}${row('Hazards',E.hazards)}${row('Other',E.other)}</table>
+   <h2>Questions for my VSO</h2><ol>${qs.map(q=>`<li>${esc(q)}</li>`).join('')}</ol>
+   <section class="doc"><h2>Records to bring or request</h2><pre>${esc(doc('records',''))}</pre></section>
+   <section class="doc"><h2>21-526EZ answers (draft)</h2><pre>${esc(doc('526',''))}</pre></section>${stmts}</body></html>`;}
+function printPacket(){const f=document.createElement('iframe');f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';document.body.appendChild(f);
+  const d=f.contentWindow.document;d.open();d.write(packetHTML());d.close();
+  setTimeout(()=>{try{f.contentWindow.focus();f.contentWindow.print();}catch(e){toast('Printing is blocked here. Open the file in Chrome or Safari.');}setTimeout(()=>f.remove(),60000);},300);}
+document.addEventListener('click',e=>{if(e.target.closest('[data-print-packet]'))printPacket();});
+
+const VIEWS={calc:[vCalc,()=>{bindCalc();bindCharts();}],debt:[vDebt,bindDebt],money:[vMoney,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup],dates:[vDates,bindDates],save:[vSave,bindSave]};
 function render(){
   if(!VIEWS[S.tab])S.tab='dash';
   renderTabs();renderBanner();renderFileBar();
