@@ -1196,8 +1196,10 @@ function render(){
   if(!VIEWS[S.tab])S.tab='dash';
   renderTabs();renderBanner();
   const [v,b]=VIEWS[S.tab];
-  $('#main').innerHTML=`<section class="view" role="tabpanel" aria-labelledby="tab-${S.tab}">${v()}</section>`;
-  b();
+  try{$('#main').innerHTML=`<section class="view" role="tabpanel" aria-labelledby="tab-${S.tab}">${v()}</section>`;b();}
+  catch(e){console.error(e);const bad=S.tab;
+    $('#main').innerHTML=`<section class="view"><div class="card warnbox"><h2>This tab hit a problem</h2><p>Your saved data is safe. Nothing was changed or erased.</p><p class="small">${esc(String(e&&e.message||e))}</p><div class="row"><button class="btn primary" id="errHome">Go to Dashboard</button></div></div></section>`;
+    $('#errHome').onclick=()=>{S.tab=bad==='dash'?'backup':'dash';save();render();};}
 }
 load();
 const h=(location.hash||'').slice(1);if(VIEWS[h])S.tab=h;
