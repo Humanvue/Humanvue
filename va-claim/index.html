@@ -937,13 +937,21 @@ const JOBS={
    tc:{start:140000,exp:161000,src:'PayScale puts psychiatric NPs in Minneapolis at about $161,000, with a typical range of $140,000 to $187,000 (May 2026). The DNP itself adds little pay over an MSN.'},
    roch:{start:125000,exp:140000,src:'BLS puts all NPs in Rochester at $119,980 (May 2025). Psych NPs usually earn above the NP average, so this is an estimate.'}}}};
 const CITY={tc:'Twin Cities',roch:'Rochester'};
+const VA_PAY={ // Minneapolis VA Health Care System, which also runs the Rochester VA clinic. Title 38 nurse pay, 2026.
+  rn:{start:90469,exp:107000,src:'VA year 1 is the lowest rate on a 2026 Minneapolis VA RN posting ($90,469 to $154,749 across Nurse I to III). Experienced is the median of 1,162 Minneapolis VA RN salaries on Glassdoor (Oct 2026).'},
+  np:{start:140000,exp:160000,src:'VA psychiatric NPs are usually Nurse III or IV. This is an estimate: the top of the Minneapolis VA RN range is $154,749, and NP roles sit at or above it.'},
+  grades:[['Nurse I','New BSN grad','$90,500 to start'],['Nurse II','BSN with 1 to 2 years, or an MSN','$100k to $120k'],['Nurse III','MSN or DNP, charge or specialty roles','up to $154,749'],['Nurse practitioner','PMHNP, usually Nurse III or IV','$140k to $175k (estimate)']],
+  fers:.044,match:.05,general:[[2025,.02],[2026,.01],[2027,0]],stepAvg:.015,hospRaise:.03};
+function payPath(job,emp,years){ // yearly pay: rises from first-year to experienced over 3 years, then by typical raises
+  const J=emp==='va'?VA_PAY[job]:JOBS[job].cities[planView().city],g=emp==='va'?.02:VA_PAY.hospRaise;
+  return Array.from({length:years},(_,k)=>k<3?J.start+(J.exp-J.start)*k/3:J.exp*Math.pow(1+g,k-3));}
 const TAX={fedStd:16100,fed65:2050,fed:[[12400,.10],[50400,.12],[105700,.22],[201775,.24],[256225,.32],[640600,.35],[1/0,.37]],
   mnStd:15300,mn:[[33310,.0535],[109430,.068],[203150,.0785],[1/0,.0985]],ssBase:184500,mnSSLimit:82190};
 const TRICARE_SELECT=186.96,PART_B=202.90;
 const money0=n=>n.toLocaleString(undefined,{style:'currency',currency:'USD',maximumFractionDigits:0});
 function bracketTax(income,br){let tax=0,low=0;for(const[top,rate]of br){if(income<=low)break;tax+=(Math.min(income,top)-low)*rate;low=top;}return tax;}
 const SS_AGE={62:.70,67:1,70:1.24};
-function planView(){S.planView=Object.assign({date:'2027-09-30',job:'rn',city:'tc',stage:'start',va:'est',ss:'67',debt:'now',pay:'cash',mngi:'on'},S.planView||{});return S.planView;}
+function planView(){S.planView=Object.assign({date:'2027-09-30',job:'rn',emp:'civ',city:'tc',stage:'start',va:'est',ss:'67',debt:'now',pay:'cash',mngi:'on'},S.planView||{});return S.planView;}
 function planResult(R,over){
   const P=S.plan,V=Object.assign({},planView(),over||{}),O=P.options[V.date]||P.options[Object.keys(P.options)[0]];
   const mult=Math.min(.75,.025*O.points/360),retGross=Math.round(O.high3*mult);
@@ -951,10 +959,11 @@ function planResult(R,over){
   const L=[],M=x=>Math.round(x/12);
   L.push({side:'duty',k:'Army retired pay',v:ret,note:`${(mult*100).toFixed(2)}% of a ${money(O.high3)} High-3 average (${O.grade})${crdp?'':', reduced by your VA pay because the rating is under 50%'}`});
   L.push({side:'duty',k:'VA disability',v:va,note:`${vaPct}%${V.va==='est'?' from the calculator above':' what-if'}, tax free`});
-  let fedInc=ret*12,mnInc=0,fica=0;const retired=V.stage==='retired';
+  let fedInc=ret*12,mnInc=0,fica=0,fers=0;const retired=V.stage==='retired';
   if(!retired){
-    const J=JOBS[V.job].cities[V.city],sal=V.stage==='exp'?J.exp:J.start;
-    L.push({side:'study',k:`${JOBS[V.job].name}, ${CITY[V.city]}`,v:M(sal),note:`${money0(sal)} a year, ${V.stage==='exp'?'experienced':'first year'}`});
+    const va=V.emp==='va',J=va?VA_PAY[V.job]:JOBS[V.job].cities[V.city],sal=V.stage==='exp'?J.exp:J.start;
+    L.push({side:'study',k:`${JOBS[V.job].name}, ${va?'Minneapolis VA':CITY[V.city]}`,v:M(sal),note:`${money0(sal)} a year, ${V.stage==='exp'?'experienced':'first year'}`});
+    if(va)fers=sal*VA_PAY.fers;
     fedInc+=sal;mnInc=sal;fica=Math.min(sal,TAX.ssBase)*.062+sal*.0145;
   }else{
     const ss=Math.round(P.ss67*SS_AGE[V.ss]);
@@ -966,6 +975,7 @@ function planResult(R,over){
   const out=[{k:'Federal income tax',v:M(fed),note:'Single filer, standard deduction, 2026 brackets'},
     {k:'Minnesota income tax',v:M(mn),note:retired?'Minnesota does not tax military retired pay, and your Social Security stays under its income limit':'Minnesota does not tax military retired pay or VA pay, so only the salary is taxed'}];
   if(fica)out.push({k:'Social Security and Medicare tax',v:M(fica),note:'7.65% of the salary'});
+  if(fers)out.push({k:'FERS pension contribution',v:M(fers),note:'4.4% of VA pay goes to your federal pension. The VA also puts 5% of pay in your TSP if you put in 5%.'});
   out.push(retired?{k:'Medicare Part B',v:Math.round(PART_B),note:'Required to keep TRICARE For Life, which then costs nothing'}:{k:'TRICARE Select',v:Math.round(TRICARE_SELECT/12),note:`Retiree Group A, ${money(TRICARE_SELECT)} a year in 2026. Prime is $381.96.`});
   const inc=L.reduce((a,b)=>a+b.v,0),ded=out.reduce((a,b)=>a+b.v,0),net=inc-ded;
   const B=P.budget,spend=B?B.groups.reduce((a,g)=>a+((V.debt==='paid'&&g.debt)||(V.off&&V.off[g.k])?0:g.v),0):0;
@@ -984,7 +994,7 @@ function vPlan(R){
   const seg=(key,opts)=>`<div class="seg" role="group">${opts.map(([v,n])=>`<button class="btn sm ${V[key]===v?'on':''}" data-pv="${key}" data-val="${v}" aria-pressed="${V[key]===v}">${n}</button>`).join('')}</div>`;
   const line=r=>`<div class="pl-row ${r.side||''}"><div><b>${esc(r.k)}</b><div class="small muted">${esc(r.note)}</div></div><div class="amt">${money0(r.v)}<div class="small muted yr-amt">${money0(r.v*12)}/yr</div></div></div>`;
   const other=Object.keys(X.P.options).filter(d=>d!==V.date).map(d=>planResult(R,{date:d}))[0];
-  const J=JOBS[V.job].cities[V.city];
+  const J=V.emp==='va'?VA_PAY[V.job]:JOBS[V.job].cities[V.city];
   // lifetime difference between the two dates, to age 85
   const yrs=85-(new Date(V.date).getFullYear()+(new Date(V.date).getMonth()+1)/12-+X.P.born.slice(0,4)-(+X.P.born.slice(5,7))/12);
   const diff=other?X.ret-other.ret:0;
@@ -1001,7 +1011,8 @@ function vPlan(R){
    <div class="stack" style="gap:8px">
     <div><div class="eyebrow-s">Retire from AGR</div>${seg('date',Object.entries(X.P.options).map(([d,o])=>[d,o.label]))}</div>
     <div><div class="eyebrow-s">Nursing job</div>${seg('job',[['rn','BSN RN'],['np','PMHNP, DNP']])}</div>
-    <div><div class="eyebrow-s">City</div>${seg('city',[['tc','Twin Cities'],['roch','Rochester']])}</div>
+    <div><div class="eyebrow-s">Employer</div>${seg('emp',[['civ','Hospital or clinic'],['va','The VA']])}</div>
+    ${V.emp==='va'?'':`<div><div class="eyebrow-s">City</div>${seg('city',[['tc','Twin Cities'],['roch','Rochester']])}</div>`}
     <div><div class="eyebrow-s">VA rating</div>${seg('va',[['est',`My estimate (${R.rounded}%)`],['70','70%'],['100','100%']])}</div>
     <div><div class="eyebrow-s">Stage</div>${seg('stage',[['start','First year working'],['exp','Experienced'],['retired','Fully retired']])}</div>
     ${V.stage==='retired'?`<div><div class="eyebrow-s">Start Social Security at</div>${seg('ss',[['62','62'],['67','67'],['70','70']])}</div>`:''}
@@ -1012,13 +1023,37 @@ function vPlan(R){
    ${bud}
    <div class="panel-in stack"><div class="eyebrow-s">Your path, take-home each month</div>${pathRows}
      <p class="small muted">Bars show take-home${B?'; the line marks your spending, and the number under each amount is what is left over':''}. The PMHNP path assumes you finish the DNP about 2030 while working as an RN.</p></div>
+   ${vVaJob(R)}
    ${vDnp(R)}
-   ${X.P.unions?`<div class="panel-in stack"><div class="eyebrow-s">Nurse unions, ${CITY[V.city]}</div><ul class="small">${X.P.unions[V.city].map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`:''}
+   ${X.P.unions&&V.emp!=='va'?`<div class="panel-in stack"><div class="eyebrow-s">Nurse unions, ${CITY[V.city]}</div><ul class="small">${X.P.unions[V.city].map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`:''}
    <p class="small"><b>Retire date.</b> ${esc(X.O.note)}${other?` Retiring ${esc(other.O.label)} instead pays ${money0(other.ret)} a month${diff?`, so this choice is worth about ${money0(Math.abs(diff)*12*Math.max(0,yrs))} ${diff>0?'more':'less'} by age 85`:''}.`:''}</p>
    <p class="small"><b>Pay source.</b> ${esc(J.src)}${V.job==='np'?' PMHNP pay starts after the DNP, so plan on RN pay until you finish it.':''}</p>
    <p class="small"><b>Concurrent receipt.</b> ${X.crdp?'At 50% or more you get full retired pay and full VA pay (CRDP).':'Under 50%, VA pay is taken out of retired pay, but the VA part is tax free. At 50% you would get both in full (CRDP).'} Combat-Related Special Compensation can also pay both for Iraq-related conditions.${X.vaPct>=70?` At ${X.vaPct}% you also qualify for Minnesota's homestead exclusion of $${X.vaPct>=100?'300,000':'150,000'} of your home's value, which cuts your property tax.`:''}</p>
    <details><summary class="small"><b>Other money to plan for</b></summary><ul class="small">${X.P.extras.map(t=>`<li>${esc(t)}</li>`).join('')}<li>Survivor Benefit Plan: not needed while you are single. If you marry, you can elect it within the first year.</li></ul></details>
    <p class="small muted">Estimates only. Retired pay assumes a 3.6% raise in January 2027 and the High-3 plan (your service began before 2018 and you had too many points to switch to BRS). Confirm your numbers with the state retirement services office and DFAS before you pick a date.</p></div>`;
+}
+function vVaJob(R){ // working for the VA: pay scale, raises and benefits next to a hospital job
+  const V=planView(),P=S.plan,job=V.job,N=21,r0=ymIdx(V.date.slice(0,7))+1,y0=job==='np'?Math.max(r0,ymIdx(P.npStart||'2030-07')):r0,Y0=Math.ceil(y0/12);
+  const va=payPath(job,'va',N),civ=payPath(job,'civ',N),xs=Array.from({length:N},(_,k)=>(Y0+k)*12);
+  const ageStart=(r0-ymIdx(P.born))/12,yrs62=Math.max(0,Math.floor(62-ageStart)),atEnd=Math.max(0,Math.floor(62-(y0-ymIdx(P.born))/12)),hi3=va.slice(Math.max(0,atEnd-3),atEnd).reduce((a,b)=>a+b,0)/3||va[0];
+  const pen=Math.round(hi3*.01*yrs62/12),match=va.slice(0,atEnd).reduce((a,b)=>a+b*VA_PAY.match,0);
+  const tile=(lab,big,sub)=>`<div class="tile"><div class="eyebrow-s">${lab}</div><div class="tbig">${big}</div><div class="small muted">${sub}</div></div>`;
+  const nm=job==='np'?'PMHNP':'RN';
+  return `<div class="panel-in stack"><div class="eyebrow-s">Working for the VA</div>
+   <p class="small">${V.emp==='va'?'You are looking at the VA option. The take-home above uses Minneapolis VA pay.':'Switch Employer to <b>The VA</b> above to run every number with VA pay.'} The Minneapolis VA Health Care System also runs the Rochester VA clinic, so the same pay applies to both cities.</p>
+   <div class="pl-list"><div class="eyebrow-s">VA nurse pay, Minneapolis 2026</div>${VA_PAY.grades.map(g=>`<div class="pl-row"><div><b>${g[0]}</b><div class="small muted">${g[1]}</div></div><div class="amt small">${g[2]}</div></div>`).join('')}</div>
+   <div class="tiles">${tile(`${nm} year 1`,money0(va[0]),`VA, vs ${money0(civ[0])} at a hospital`)}${tile(`${nm} year 10`,money0(va[9]),`VA, vs ${money0(civ[9])} at a hospital`)}${tile('VA pension at 62',`${money0(pen)}/mo`,`after ${yrs62} years at the VA, for life, on top of your Army pay`)}</div>
+   ${lineChart('vapay',{xs,tiplab:i=>`${i/12} (age ${Math.floor((i-ymIdx(P.born))/12)})`,aria:'Yearly pay at the VA and at a hospital over 20 years',series:[{n:`VA ${nm}`,v:va,c:'var(--s1)',fill:true},{n:`Hospital ${nm}`,v:civ,c:'var(--s2)'}]})}
+   <p class="small"><b>How VA raises work.</b> Every January VA pay goes up with the federal raise: 2% in 2025, 1% in 2026, and 0% proposed for 2027 (not final). On top of that you get step raises of about 3% each, more often in your first years, plus a promotion from Nurse I to Nurse II, usually after 1 to 2 years with a BSN. The VA also resets its Minneapolis pay table when local hospitals pay more. This chart uses about 2% a year at the VA after year 3 and 3% at a union hospital, so the hospital pulls ahead over time while the VA adds a pension and TSP match.</p>
+   <details><summary class="small"><b>VA benefits worth money</b></summary><ul class="small">
+    <li><b>TSP match:</b> the VA adds 1% of pay automatically and matches up to 4% more when you put in 5%. That is about ${money0(va[0]*VA_PAY.match)} a year at first, about ${money0(match)} by age 62 before growth.</li>
+    <li><b>FERS pension:</b> 1% of your highest 3 years of pay for each year worked (1.1% if you stay to 62 with 20 years). You pay 4.4% of pay toward it, shown in taxes and costs above. Your Army years can't be added because you get Army retired pay.</li>
+    <li><b>Help paying for the DNP:</b> the VA Employee Incentive Scholarship (EISP) can pay tuition while you work there, and the Education Debt Reduction Program (EDRP) can repay up to $200,000 of school loans over 5 years. Both need a work commitment.</li>
+    <li><b>Hiring:</b> veterans' preference applies, and a 30% or higher VA rating adds 10 points. Your Army retired pay is not cut for working for the government.</li>
+    <li><b>Extra pay:</b> about 10% more for evening and night shifts and 25% more on weekends.</li>
+    <li><b>Leave:</b> 13 days of vacation a year to start (20 after 3 years), 13 sick days and 11 federal holidays. Your Army years don't speed this up unless your retirement is disability or combat related.</li>
+    <li><b>Health:</b> keep TRICARE as a retiree. You can skip the federal health plan.</li></ul>
+    <p class="small muted">${esc(VA_PAY[job].src)} The VA's official 2026 Minneapolis nurse pay table wasn't readable from here, so ask a Minneapolis VA nurse recruiter for it to confirm your grade and step.</p></details></div>`;
 }
 const DNP_FEES={ // herzing.edu/fee-schedule; used when the plan has no fees of its own
   perTerm:[{k:'Nursing Program Fee',v:850,note:'Every semester. Includes the background check before clinicals.'}],
@@ -1192,7 +1227,8 @@ function vDebt(){
    <div class="stack" style="gap:8px">
     <div><div class="eyebrow-s">Retire from AGR</div>${segBtns(V,'date',Object.entries(P.options).map(([d,o])=>[d,o.label]))}</div>
     <div><div class="eyebrow-s">Nursing job</div>${segBtns(V,'job',[['rn','BSN RN'],['np','PMHNP, DNP']])}</div>
-    <div><div class="eyebrow-s">City</div>${segBtns(V,'city',[['tc','Twin Cities'],['roch','Rochester']])}</div>
+    <div><div class="eyebrow-s">Employer</div>${segBtns(V,'emp',[['civ','Hospital or clinic'],['va','The VA']])}</div>
+    ${V.emp==='va'?'':`<div><div class="eyebrow-s">City</div>${segBtns(V,'city',[['tc','Twin Cities'],['roch','Rochester']])}</div>`}
     <div><div class="eyebrow-s">VA rating</div>${segBtns(V,'va',[['est',`My estimate (${R.rounded}%)`],['70','70%'],['100','100%']])}</div>
     <div><div class="eyebrow-s">Payoff order</div>${segBtns(V,'dstrat',[['aval','Highest rate first'],['snow','Smallest balance first'],['min','Minimums only']])}</div>
     ${V.dstrat==='min'?'':`<div><div class="eyebrow-s">Extra toward debt</div>${segBtns(V,'dextra',[['none','None'],['half','Half of what is left over'],['all','All of what is left over']])}</div>`}
@@ -1356,7 +1392,7 @@ function vMoney(){
 }
 function moneyHead(V){const P=S.plan;return `<div class="panel stack"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3>Money charts</h3><span class="small muted">Uses the same switches as the Calculator and Debt plan</span></div>
   ${segBtns(V,'msec',[['plan','Planning'],['debt','Debt'],['invest','Investing'],['home','Property tax']])}
-  <div class="row" style="gap:8px;flex-wrap:wrap"><div><div class="eyebrow-s">Retire from AGR</div>${segBtns(V,'date',Object.entries(P.options).map(([d,o])=>[d,o.label]))}</div><div><div class="eyebrow-s">Nursing job</div>${segBtns(V,'job',[['rn','BSN RN'],['np','PMHNP']])}</div></div></div>`;}
+  <div class="row" style="gap:8px;flex-wrap:wrap"><div><div class="eyebrow-s">Retire from AGR</div>${segBtns(V,'date',Object.entries(P.options).map(([d,o])=>[d,o.label]))}</div><div><div class="eyebrow-s">Nursing job</div>${segBtns(V,'job',[['rn','BSN RN'],['np','PMHNP']])}</div><div><div class="eyebrow-s">Employer</div>${segBtns(V,'emp',[['civ','Hospital'],['va','The VA']])}</div></div></div>`;}
 function bindDebt(){bindPlan();bindCharts();}
 function bindCharts(){
   document.querySelectorAll('.chart-wrap').forEach(wr=>{const tip=wr.querySelector('.tip'),svg=wr.querySelector('svg'),C=CHARTS[wr.dataset.chart];
@@ -1372,7 +1408,7 @@ function bindCharts(){
 function bindPlan(){document.querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{planView()[b.dataset.pv]=b.dataset.val;save();render();});
   document.querySelectorAll('[data-poff]').forEach(c=>c.onchange=()=>{const o=offSet();if(c.checked)delete o[c.dataset.poff];else o[c.dataset.poff]=true;save();render();});}
 
-const VIEWS={calc:[vCalc,bindCalc],debt:[vDebt,bindDebt],money:[vMoney,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup]};
+const VIEWS={calc:[vCalc,()=>{bindCalc();bindCharts();}],debt:[vDebt,bindDebt],money:[vMoney,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup]};
 function render(){
   if(!VIEWS[S.tab])S.tab='dash';
   renderTabs();renderBanner();renderFileBar();
