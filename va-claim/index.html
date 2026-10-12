@@ -142,7 +142,7 @@ ul.clean{list-style:none;margin:0;padding:0}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:var(--r);font-weight:600;z-index:20}
 .confirm{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px;border:1px solid var(--bad);border-radius:var(--r);background:var(--bad-bg)}
 a{color:var(--study)}
-.kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;font-size:.9rem}
+.kv{display:grid;grid-template-columns:fit-content(55%) minmax(0,1fr);gap:4px 14px;font-size:.9rem}
 .kv dt{color:var(--ink-3)}.kv dd{margin:0;font-variant-numeric:tabular-nums}
 .calc-head{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
 .calc-head .big{font-family:var(--f-display);font-weight:700;font-size:3rem;line-height:1;font-variant-numeric:tabular-nums}
@@ -154,6 +154,22 @@ a{color:var(--study)}
 .pl-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start;padding:8px 0 8px 10px;border-bottom:1px solid var(--line);border-left:4px solid var(--line)}
 .pl-row.duty{border-left-color:var(--duty)}.pl-row.study{border-left-color:var(--study)}.pl-row .amt{font-variant-numeric:tabular-nums;font-weight:600}
 details.panel>summary{cursor:pointer}
+.panel-in{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--surface-2)}
+.pl-row.off{opacity:.5}.pl-row.tot{border-left-color:var(--accent)}
+.pos{color:var(--good)}.neg{color:var(--bad)}
+.path-row{display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 0}
+.path-bar{position:relative;height:22px;background:var(--surface);border-radius:6px;overflow:hidden}
+.path-bar .fill{position:absolute;inset:0 auto 0 0;border-radius:6px}.path-bar .fill.work{background:var(--study)}.path-bar .fill.ret{background:var(--duty)}
+.path-bar .tick{position:absolute;top:-2px;bottom:-2px;width:3px;background:var(--ink);transform:translateX(-1px)}
+.tbl-wrap{overflow-x:auto;max-height:520px;overflow-y:auto;border:1px solid var(--line);border-radius:8px}
+.mtbl{border-collapse:collapse;width:100%;font-size:.85rem;font-variant-numeric:tabular-nums}
+.mtbl th,.mtbl td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+.mtbl th:first-child,.mtbl td:first-child{text-align:left;white-space:normal;min-width:9rem}
+.mtbl thead th{position:sticky;top:0;background:var(--surface);font-weight:600}
+.mtbl tr.yr td{font-weight:700;background:var(--surface)}
+.yr-amt{font-weight:400}
+.path-row .amt{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+@media (max-width:560px){.path-row{grid-template-columns:1fr auto}.path-row .path-bar{grid-column:1/-1;grid-row:2}}
 @media (max-width:560px){.calc-row{grid-template-columns:1fr 1fr}.calc-row>:first-child{grid-column:1/-1}.calc-row>:last-child:empty{display:none}}
 @media (prefers-reduced-motion:no-preference){.bar>span,.ring circle{transition:all .4s ease}}
 </style>
@@ -874,55 +890,125 @@ const TAX={fedStd:16100,fed65:2050,fed:[[12400,.10],[50400,.12],[105700,.22],[20
 const TRICARE_SELECT=186.96,PART_B=202.90;
 const money0=n=>n.toLocaleString(undefined,{style:'currency',currency:'USD',maximumFractionDigits:0});
 function bracketTax(income,br){let tax=0,low=0;for(const[top,rate]of br){if(income<=low)break;tax+=(Math.min(income,top)-low)*rate;low=top;}return tax;}
-function planView(){S.planView=Object.assign({date:'2027-09-30',job:'rn',city:'tc',stage:'start'},S.planView||{});return S.planView;}
-function planResult(R){
-  const P=S.plan,V=planView(),O=P.options[V.date]||P.options[Object.keys(P.options)[0]];
+const SS_AGE={62:.70,67:1,70:1.24};
+function planView(){S.planView=Object.assign({date:'2027-09-30',job:'rn',city:'tc',stage:'start',va:'est',ss:'67',debt:'now',pay:'cash'},S.planView||{});return S.planView;}
+function planResult(R,over){
+  const P=S.plan,V=Object.assign({},planView(),over||{}),O=P.options[V.date]||P.options[Object.keys(P.options)[0]];
   const mult=Math.min(.75,.025*O.points/360),retGross=Math.round(O.high3*mult);
-  const va=Math.round(R.pay),crdp=R.rounded>=50,ret=crdp?retGross:Math.max(0,retGross-va);
+  const vaPct=V.va==='est'?R.rounded:+V.va,va=Math.round(monthlyPay(vaPct,calcState().dep)),crdp=vaPct>=50,ret=crdp?retGross:Math.max(0,retGross-va);
   const L=[],M=x=>Math.round(x/12);
   L.push({side:'duty',k:'Army retired pay',v:ret,note:`${(mult*100).toFixed(2)}% of a ${money(O.high3)} High-3 average (${O.grade})${crdp?'':', reduced by your VA pay because the rating is under 50%'}`});
-  L.push({side:'duty',k:'VA disability',v:va,note:`${R.rounded}% from the calculator above, tax free`});
-  let fedInc=ret*12,mnInc=0,fica=0,health=0;
-  if(V.stage!=='retired'){
+  L.push({side:'duty',k:'VA disability',v:va,note:`${vaPct}%${V.va==='est'?' from the calculator above':' what-if'}, tax free`});
+  let fedInc=ret*12,mnInc=0,fica=0;const retired=V.stage==='retired';
+  if(!retired){
     const J=JOBS[V.job].cities[V.city],sal=V.stage==='exp'?J.exp:J.start;
-    L.push({side:'study',k:`${JOBS[V.job].name}, ${CITY[V.city]}`,v:M(sal),note:`${money(sal)} a year, ${V.stage==='exp'?'experienced':'first year'}`});
-    fedInc+=sal;mnInc=sal;fica=Math.min(sal,TAX.ssBase)*.062+sal*.0145;health=TRICARE_SELECT;
+    L.push({side:'study',k:`${JOBS[V.job].name}, ${CITY[V.city]}`,v:M(sal),note:`${money0(sal)} a year, ${V.stage==='exp'?'experienced':'first year'}`});
+    fedInc+=sal;mnInc=sal;fica=Math.min(sal,TAX.ssBase)*.062+sal*.0145;
   }else{
-    L.push({side:'plain',k:'Social Security at 67',v:P.ss67,note:`Full retirement age is ${P.fra}`});
-    fedInc+=P.ss67*12*.85;health=PART_B*12;
+    const ss=Math.round(P.ss67*SS_AGE[V.ss]);
+    L.push({side:'plain',k:`Social Security from age ${V.ss}`,v:ss,note:V.ss==='67'?`Full retirement age is ${P.fra}`:`${Math.round(SS_AGE[V.ss]*100)}% of your age-67 amount, for life`});
+    fedInc+=ss*12*.85;
   }
-  const fed=bracketTax(Math.max(0,fedInc-TAX.fedStd-(V.stage==='retired'?TAX.fed65:0)),TAX.fed);
+  const fed=bracketTax(Math.max(0,fedInc-TAX.fedStd-(retired?TAX.fed65:0)),TAX.fed);
   const mn=bracketTax(Math.max(0,mnInc-TAX.mnStd),TAX.mn);
   const out=[{k:'Federal income tax',v:M(fed),note:'Single filer, standard deduction, 2026 brackets'},
-    {k:'Minnesota income tax',v:M(mn),note:V.stage==='retired'?'Minnesota does not tax military retired pay, and your Social Security stays under its income limit':'Minnesota does not tax military retired pay or VA pay, so only the salary is taxed'}];
+    {k:'Minnesota income tax',v:M(mn),note:retired?'Minnesota does not tax military retired pay, and your Social Security stays under its income limit':'Minnesota does not tax military retired pay or VA pay, so only the salary is taxed'}];
   if(fica)out.push({k:'Social Security and Medicare tax',v:M(fica),note:'7.65% of the salary'});
-  out.push(V.stage==='retired'?{k:'Medicare Part B',v:Math.round(PART_B),note:'Required to keep TRICARE For Life, which then costs nothing'}:{k:'TRICARE Select',v:Math.round(TRICARE_SELECT/12),note:`Retiree Group A, ${money(TRICARE_SELECT)} a year in 2026. Prime is $381.96.`});
-  out.push({k:'Survivor Benefit Plan',v:0,note:'Not needed while you are single. If you marry, you can elect it within the first year.'});
-  const inc=L.reduce((a,b)=>a+b.v,0),ded=out.reduce((a,b)=>a+b.v,0);
-  return{P,V,O,mult,retGross,ret,va,crdp,L,out,inc,ded,net:inc-ded};
+  out.push(retired?{k:'Medicare Part B',v:Math.round(PART_B),note:'Required to keep TRICARE For Life, which then costs nothing'}:{k:'TRICARE Select',v:Math.round(TRICARE_SELECT/12),note:`Retiree Group A, ${money(TRICARE_SELECT)} a year in 2026. Prime is $381.96.`});
+  const inc=L.reduce((a,b)=>a+b.v,0),ded=out.reduce((a,b)=>a+b.v,0),net=inc-ded;
+  const B=P.budget,spend=B?B.groups.reduce((a,g)=>a+(V.debt==='paid'&&g.debt?0:g.v),0):0;
+  return{P,V,O,mult,retGross,ret,va,vaPct,crdp,L,out,inc,ded,net,spend,left:net-spend};
+}
+function planPath(R){ // phases of your career, using the selected date, job, city and VA view
+  const V=planView(),np=V.job==='np',P=S.plan;
+  const ph=[['Oct 2027 to 2028','RN, first year',{job:'rn',stage:'start'}],['2028 to 2030','RN, experienced'+(np?', DNP school':''),{job:'rn',stage:'exp'}]];
+  if(np)ph.push(['2030 to 2049','PMHNP, DNP',{job:'np',stage:'exp'}]);else ph[1][0]='2028 to 2049';
+  ph.push([P.fra.replace(/^\w+ /,'')+' on','Fully retired',{stage:'retired'}]);
+  return ph.map(([when,what,o])=>Object.assign({when,what},planResult(R,o)));
 }
 function vPlan(R){
   if(!S.plan)return `<div class="panel stack"><h3>Retirement income planner</h3><p class="small muted">Restore your Claim Kit backup (Backup & help) to load your retirement numbers.</p></div>`;
-  const X=planResult(R),V=X.V;
+  const X=planResult(R),V=X.V,B=X.P.budget;
   const seg=(key,opts)=>`<div class="seg" role="group">${opts.map(([v,n])=>`<button class="btn sm ${V[key]===v?'on':''}" data-pv="${key}" data-val="${v}" aria-pressed="${V[key]===v}">${n}</button>`).join('')}</div>`;
-  const line=r=>`<div class="pl-row ${r.side||''}"><div><b>${esc(r.k)}</b><div class="small muted">${esc(r.note)}</div></div><div class="amt">${money0(r.v)}</div></div>`;
-  const other=Object.keys(X.P.options).filter(d=>d!==V.date).map(d=>{const o=X.P.options[d];return{label:o.label,pay:Math.round(o.high3*Math.min(.75,.025*o.points/360))};})[0];
+  const line=r=>`<div class="pl-row ${r.side||''}"><div><b>${esc(r.k)}</b><div class="small muted">${esc(r.note)}</div></div><div class="amt">${money0(r.v)}<div class="small muted yr-amt">${money0(r.v*12)}/yr</div></div></div>`;
+  const other=Object.keys(X.P.options).filter(d=>d!==V.date).map(d=>planResult(R,{date:d}))[0];
   const J=JOBS[V.job].cities[V.city];
+  // lifetime difference between the two dates, to age 85
+  const yrs=85-(new Date(V.date).getFullYear()+(new Date(V.date).getMonth()+1)/12-+X.P.born.slice(0,4)-(+X.P.born.slice(5,7))/12);
+  const diff=other?X.ret-other.ret:0;
+  const path=planPath(R),maxV=Math.max(...path.map(p=>Math.max(p.net,p.spend)))*1.05;
+  const pathRows=path.map(p=>`<div class="path-row"><div class="small"><b>${esc(p.what)}</b><br><span class="muted">${esc(p.when)}</span></div>
+     <div class="path-bar" aria-hidden="true"><span class="fill ${p.V.stage==='retired'?'ret':'work'}" style="width:${(p.net/maxV*100).toFixed(1)}%"></span>${B?`<span class="tick" style="left:${(p.spend/maxV*100).toFixed(1)}%"></span>`:''}</div>
+     <div class="small amt">${money0(p.net)}/mo<br><span class="muted">${money0(p.net*12)}/yr</span>${B?`<br><span class="${p.left>=0?'pos':'neg'}">${p.left>=0?'+':'−'}${money0(Math.abs(p.left*12))}/yr left</span>`:''}</div></div>`).join('');
+  const bud=B?`<div class="panel-in stack"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><div class="eyebrow-s">Your spending vs take-home</div><span class="small muted">${esc(B.source)}</span></div>
+     ${seg('debt',[['now','Debts as they are now'],['paid','Debts paid off']])}
+     <div class="pl-list">${B.groups.map(g=>`<div class="pl-row ${g.debt&&V.debt==='paid'?'off':''}"><div><b>${esc(g.k)}</b>${g.note?`<div class="small muted">${esc(g.note)}</div>`:''}</div><div class="amt">${g.debt&&V.debt==='paid'?'<s>'+money0(g.v)+'</s>':money0(g.v)}</div></div>`).join('')}
+      <div class="pl-row tot"><div><b>Spending a month</b></div><div class="amt">${money0(X.spend)}<div class="small muted">${money0(X.spend*12)}/yr</div></div></div>
+      <div class="pl-row tot"><div><b>Left over a month</b><div class="small muted">Take-home ${money0(X.net)} minus spending</div></div><div class="amt ${X.left>=0?'pos':'neg'}">${X.left>=0?'':'−'}${money0(Math.abs(X.left))}<div class="small">${X.left>=0?'':'−'}${money0(Math.abs(X.left*12))}/yr</div></div></div></div>
+     <p class="small">Today you take home about ${money0(B.nowIncome)} a month and spend ${money0(B.nowSpend)}, so you are short about ${money0(B.nowSpend-B.nowIncome)} a month. ${esc(B.tip)}</p></div>`:'';
   return `<div class="panel stack"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3>Retirement income planner</h3><span class="small muted">Monthly, in today's dollars</span></div>
    <div class="stack" style="gap:8px">
     <div><div class="eyebrow-s">Retire from AGR</div>${seg('date',Object.entries(X.P.options).map(([d,o])=>[d,o.label]))}</div>
     <div><div class="eyebrow-s">Nursing job</div>${seg('job',[['rn','BSN RN'],['np','PMHNP, DNP']])}</div>
     <div><div class="eyebrow-s">City</div>${seg('city',[['tc','Twin Cities'],['roch','Rochester']])}</div>
-    <div><div class="eyebrow-s">Stage</div>${seg('stage',[['start','First year working'],['exp','Experienced'],['retired','Fully retired, 67+']])}</div>
+    <div><div class="eyebrow-s">VA rating</div>${seg('va',[['est',`My estimate (${R.rounded}%)`],['70','70%'],['100','100%']])}</div>
+    <div><div class="eyebrow-s">Stage</div>${seg('stage',[['start','First year working'],['exp','Experienced'],['retired','Fully retired']])}</div>
+    ${V.stage==='retired'?`<div><div class="eyebrow-s">Start Social Security at</div>${seg('ss',[['62','62'],['67','67'],['70','70']])}</div>`:''}
    </div>
    <div class="calc-head"><div><div class="eyebrow-s">Take-home a month</div><div class="big">${money0(X.net)}</div><div class="small muted">${money0(X.net*12)} a year after tax and health costs</div></div>
-    <div><div class="eyebrow-s">Income a month</div><div class="big" style="font-size:2rem">${money0(X.inc)}</div><div class="small muted">before tax</div></div></div>
+    ${B?`<div><div class="eyebrow-s">Left over after spending</div><div class="big ${X.left>=0?'pos':'neg'}" style="font-size:2rem">${X.left>=0?'':'−'}${money0(Math.abs(X.left))}</div><div class="small muted">${X.left>=0?'':'−'}${money0(Math.abs(X.left*12))} a year, ${V.debt==='paid'?'with debts paid off':'with today\'s debt payments'}</div></div>`:''}</div>
    <div class="pl-list"><div class="eyebrow-s">Income</div>${X.L.map(line).join('')}<div class="eyebrow-s" style="margin-top:10px">Taxes and costs</div>${X.out.map(line).join('')}</div>
-   <p class="small"><b>Retire date.</b> ${esc(X.O.note)}${other?` Retiring ${esc(other.label)} instead pays ${money0(other.pay)} a month.`:''}</p>
+   ${bud}
+   <div class="panel-in stack"><div class="eyebrow-s">Your path, take-home each month</div>${pathRows}
+     <p class="small muted">Bars show take-home${B?'; the line marks your spending, and the number under each amount is what is left over':''}. The PMHNP path assumes you finish the DNP about 2030 while working as an RN.</p></div>
+   ${vDnp(R)}
+   ${X.P.unions?`<div class="panel-in stack"><div class="eyebrow-s">Nurse unions, ${CITY[V.city]}</div><ul class="small">${X.P.unions[V.city].map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`:''}
+   <p class="small"><b>Retire date.</b> ${esc(X.O.note)}${other?` Retiring ${esc(other.O.label)} instead pays ${money0(other.ret)} a month${diff?`, so this choice is worth about ${money0(Math.abs(diff)*12*Math.max(0,yrs))} ${diff>0?'more':'less'} by age 85`:''}.`:''}</p>
    <p class="small"><b>Pay source.</b> ${esc(J.src)}${V.job==='np'?' PMHNP pay starts after the DNP, so plan on RN pay until you finish it.':''}</p>
-   ${X.crdp?'<p class="small"><b>Concurrent receipt.</b> At 50% or more you get full retired pay and full VA pay (CRDP). Under 50%, VA pay is taken out of retired pay unless Combat-Related Special Compensation applies, which is worth asking about for Iraq-related conditions.</p>':'<p class="small"><b>Concurrent receipt.</b> Under 50%, VA pay is taken out of retired pay, but the VA part is tax free. At 50% you would get both in full (CRDP). Combat-Related Special Compensation can also pay both for Iraq-related conditions.</p>'}
-   <details><summary class="small"><b>Other money to plan for</b></summary><ul class="small">${X.P.extras.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></details>
+   <p class="small"><b>Concurrent receipt.</b> ${X.crdp?'At 50% or more you get full retired pay and full VA pay (CRDP).':'Under 50%, VA pay is taken out of retired pay, but the VA part is tax free. At 50% you would get both in full (CRDP).'} Combat-Related Special Compensation can also pay both for Iraq-related conditions.${X.vaPct>=70?` At ${X.vaPct}% you also qualify for Minnesota's homestead exclusion of $${X.vaPct>=100?'300,000':'150,000'} of your home's value, which cuts your property tax.`:''}</p>
+   <details><summary class="small"><b>Other money to plan for</b></summary><ul class="small">${X.P.extras.map(t=>`<li>${esc(t)}</li>`).join('')}<li>Survivor Benefit Plan: not needed while you are single. If you marry, you can elect it within the first year.</li></ul></details>
    <p class="small muted">Estimates only. Retired pay assumes a 3.6% raise in January 2027 and the High-3 plan (your service began before 2018 and you had too many points to switch to BRS). Confirm your numbers with the state retirement services office and DFAS before you pick a date.</p></div>`;
+}
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function dnpMonths(R){ // month-by-month budget while in the DNP program
+  const P=S.plan,D=P.dnp,V=planView();if(!D)return[];
+  const rn1=planResult(R,{job:'rn',stage:'start'}),rnX=planResult(R,{job:'rn',stage:'exp'});
+  const disc=D.discount,rows=[];let [y,m]=D.start.split('-').map(Number);m--;
+  const retireMonth=+V.date.slice(0,4)*12+(+V.date.slice(5,7)-1);
+  let loanYear={},loanTotal=0;
+  D.terms.forEach((cr,ti)=>{
+    const tuition=cr*D.perCredit*(1-disc),perMonth=tuition/4;
+    for(let k=0;k<4;k++){
+      const idx=y*12+m,since=idx-retireMonth;
+      const onOrders=since<=0,X=onOrders?null:(since<=12?rn1:rnX);
+      const take=onOrders?P.budget.nowIncome:X.net,spend=planResult(R).spend;
+      let aid=0,cash=perMonth,note='';
+      if(V.pay==='loan'){const ay=y+(m>=6?1:0);loanYear[ay]=(loanYear[ay]||0);const room=Math.max(0,D.loanAnnual-loanYear[ay]);aid=Math.min(perMonth,room);loanYear[ay]+=aid;loanTotal+=aid;cash=perMonth-aid;}
+      if(V.pay==='vre'){aid=perMonth+D.vreSub;cash=0;}
+      rows.push({y,m,label:`${MON[m]} ${y}`,term:ti+1,cr,take,spend,tuition:perMonth,aid,left:take-spend-cash+(V.pay==='vre'?D.vreSub:0),job:onOrders?'AGR':(since<=12?'RN, first year':'RN')});
+      m++;if(m>11){m=0;y++;}
+    }
+  });
+  rows.loanTotal=loanTotal;return rows;
+}
+function vDnp(R){
+  const P=S.plan,D=P.dnp,V=planView();if(!D||!P.budget)return'';
+  const rows=dnpMonths(R),total=D.terms.reduce((a,c)=>a+c,0)*D.perCredit*(1-D.discount);
+  const seg=(key,opts)=>`<div class="seg" role="group">${opts.map(([v,n])=>`<button class="btn sm ${V[key]===v?'on':''}" data-pv="${key}" data-val="${v}" aria-pressed="${V[key]===v}">${n}</button>`).join('')}</div>`;
+  const byYear={};rows.forEach(r=>{const Y=byYear[r.y]=byYear[r.y]||{take:0,spend:0,tuition:0,aid:0,left:0,n:0};['take','spend','tuition','aid','left'].forEach(k=>Y[k]+=r[k]);Y.n++;});
+  const f=n=>money0(Math.round(n)),sg=n=>`<span class="${n>=0?'pos':'neg'}">${n>=0?'':'−'}${f(Math.abs(n))}</span>`;
+  let last=null,body='';
+  rows.forEach(r=>{if(last!==null&&r.y!==last){const Y=byYear[last];body+=`<tr class="yr"><td>${last} total (${Y.n} mo)</td><td>${f(Y.take)}</td><td>${f(Y.spend)}</td><td>${f(Y.tuition)}</td><td>${f(Y.aid)}</td><td>${sg(Y.left)}</td></tr>`;}last=r.y;
+    body+=`<tr><td>${r.label}<div class="small muted">Term ${r.term}, ${r.cr} credits · ${r.job}</div></td><td>${f(r.take)}</td><td>${f(r.spend)}</td><td>${f(r.tuition)}</td><td>${r.aid?f(r.aid):'—'}</td><td>${sg(r.left)}</td></tr>`;});
+  const Y=byYear[last];body+=`<tr class="yr"><td>${last} total (${Y.n} mo)</td><td>${f(Y.take)}</td><td>${f(Y.spend)}</td><td>${f(Y.tuition)}</td><td>${f(Y.aid)}</td><td>${sg(Y.left)}</td></tr>`;
+  const loanPay=rows.loanTotal?Math.round(rows.loanTotal*(D.loanRate/12)/(1-Math.pow(1+D.loanRate/12,-120))):0;
+  return `<div class="panel-in stack"><div class="eyebrow-s">DNP school, month by month</div>
+   <p class="small"><b>${esc(D.school)}, ${esc(D.program)}.</b> ${esc(D.summary)}</p>
+   <dl class="kv"><dt>Tuition</dt><dd>${D.credits} credits at ${money0(D.perCredit)} = ${money0(D.credits*D.perCredit)}</dd><dt>${esc(D.transferName||'Transfer credits')}</dt><dd>−${D.transfer} credits (${money0(D.transfer*D.perCredit)})</dd><dt>${esc(D.discountName)}</dt><dd>−${Math.round(D.discount*100)}% (${money0((D.credits-D.transfer)*D.perCredit*D.discount)})</dd><dt>You pay</dt><dd><b>${money0(total)}</b> over ${D.terms.length} terms</dd></dl>
+   <div><div class="eyebrow-s">Pay tuition with</div>${seg('pay',[['cash','Take-home pay'],['loan','Federal loan'],['vre','VA VR&amp;E']])}</div>
+   <p class="small">${V.pay==='loan'?`Graduate Direct Unsubsidized loans cover up to ${money0(D.loanAnnual)} a year (${money0(D.loanLimit)} lifetime). Grad PLUS loans end for new borrowers on 1 Jul 2026. You would borrow about ${money0(rows.loanTotal)}, then pay about ${money0(loanPay)} a month for 10 years at ${(D.loanRate*100).toFixed(1)}%, or use the income-based Repayment Assistance Plan.`:V.pay==='vre'?`If VA approves you for Veteran Readiness and Employment (VR&amp;E, Chapter 31), it pays tuition, fees and books straight to the school and pays you about ${money0(D.vreSub)} a month while you are enrolled full time. You need a rating of 20% or more and a counselor who agrees the DNP is part of your employment plan, so this is not guaranteed. ${esc(D.vreNote||'')}`:'Tuition comes out of take-home pay each month of the term.'}</p>
+   <div class="tbl-wrap"><table class="mtbl"><thead><tr><th>Month</th><th>Take-home</th><th>Spending</th><th>Tuition</th><th>${V.pay==='vre'?'VR&amp;E':'Loan'}</th><th>Left over</th></tr></thead><tbody>${body}</tbody></table></div>
+   <p class="small muted">${esc(D.notes)}</p></div>`;
 }
 function bindPlan(){document.querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{planView()[b.dataset.pv]=b.dataset.val;save();render();});}
 
