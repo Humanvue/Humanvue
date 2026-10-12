@@ -16,7 +16,8 @@ Pass-and-play trivia for a group of friends on one phone or laptop.
 - Seasons: each calendar month is a season that starts everyone at zero. Last month's winner is the reigning champion and wears a 🏆 on their avatar.
 - Hall of Fame: every past season champion and weekly crown, newest first.
 - Weekly crown: whoever scores the most Daily Challenge points Monday to Sunday wears a 👑 on their avatar all the next week.
-- Add your own questions in the **Question bank**; they join the mix in their category.
+- Every answer screen shows a one-line **Why** explaining the right answer (`js/why.js`, keyed by question id).
+- Add your own questions in the **Question bank**, with an optional explanation; they join the mix in their category.
 - Recent games are kept as a simple history.
 - Sharing: **Invite friends** on the home screen opens the phone's share sheet (or copies the link) and shows a QR code to scan. A live game lobby has its own invite link and QR that drop friends straight into that game after they sign in (`?join=CODE`). Daily Challenge results can go out through the share sheet too.
 - Installable: `manifest.webmanifest` and `icons/` let players add it to their home screen (Safari: Share, Add to Home Screen; Chrome: menu, Add to Home screen).
@@ -85,6 +86,7 @@ without changing the game flow in `js/app.js`.
 - `index.html` – page shell
 - `styles.css` – look and feel, light and dark themes
 - `js/questions.js` – built-in categories and questions
+- `js/why.js` – the explanation shown after each built-in question
 - `js/scoring.js` – point values, streak multiplier, category-of-the-day bonus
 - `js/rewards.js` – category reward ladders and unlock thresholds
 - `js/avatar.js` – avatar options and the SVG drawing

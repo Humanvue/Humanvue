@@ -754,3 +754,7 @@ a { color: var(--brass); }
 .share-url { font-family: var(--mono); font-weight: 700; overflow-wrap: anywhere; }
 .share-card .stack { width: 100%; }
 .hall-row { justify-content: flex-start; align-items: center; }
+
+/* "Why" line under the verdict on the answer screen */
+.why { margin: 0; padding: 10px 12px; border-left: 3px solid var(--cat, var(--brass)); background: var(--surface-2); border-radius: 6px; line-height: 1.45; }
+.why strong { font-weight: 700; }

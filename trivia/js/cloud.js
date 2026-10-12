@@ -261,6 +261,7 @@
               difficulty: item.q.difficulty || 2,
               q: item.q.q,
               answer: item.q.answer,
+              why: item.q.why || '',
               custom: !!item.q.custom,
               options: item.options
             };

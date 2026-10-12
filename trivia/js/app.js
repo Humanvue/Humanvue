@@ -978,6 +978,13 @@
       '</section>';
   }
 
+  // One line on why the right answer is right. Built-in questions look it up
+  // by id (js/why.js); a friend's own question can carry its own.
+  function whyHtml(q) {
+    var why = q.why || (window.TRIVIA_WHY || {})[q.id];
+    return why ? '<p class="why"><strong>Why:</strong> ' + esc(why) + '</p>' : '';
+  }
+
   function viewReveal() {
     var g = state.game;
     var item = g.questions[g.index];
@@ -997,7 +1004,7 @@
 
     return topbar(quitButton()) +
       '<section class="card question-card" data-cat="' + item.q.category + '">' +
-        questionHeader() + verdict + unlockBanner(g.unlock, p.name) + answersHtml(true) + streak +
+        questionHeader() + verdict + whyHtml(item.q) + unlockBanner(g.unlock, p.name) + answersHtml(true) + streak +
         '<button class="btn-primary" data-action="next">' + nextLabel + '</button>' +
       '</section>' +
       '<section class="card"><h2>Scoreboard</h2>' + scoreboard(p) + '</section>';
@@ -1065,6 +1072,7 @@
             '<input type="text" id="q-wrong-2" maxlength="80" placeholder="100.4°F" aria-label="Wrong answer 2">' +
             '<input type="text" id="q-wrong-3" maxlength="80" placeholder="101.2°F" aria-label="Wrong answer 3">' +
           '</div></div>' +
+          '<div class="field"><label class="label" for="q-why">Why it\'s right (optional)</label><input type="text" id="q-why" maxlength="200" placeholder="Normal oral temperature averages about 98.6°F (37°C)."></div>' +
           (state.bankError ? '<p class="error">' + esc(state.bankError) + '</p>' : '') +
           '<button class="btn-primary" type="submit">Add question</button>' +
         '</form>' +
@@ -1730,7 +1738,7 @@
     var last = g.index + 1 >= g.questions.length;
     return topbar(leave) +
       '<section class="card question-card" data-cat="' + item.category + '">' +
-        liveHeader(g, item) + verdict + (L.unlockIndex === g.index ? unlockBanner(L.unlock, Store.user().name) : '') + answers +
+        liveHeader(g, item) + verdict + whyHtml(item) + (L.unlockIndex === g.index ? unlockBanner(L.unlock, Store.user().name) : '') + answers +
         (isHost
           ? '<button class="btn-primary" data-action="live-next">' + (last ? 'Show final scores' : 'Next question') + '</button>'
           : '<p class="progress">Waiting for ' + esc(g.hostName) + ' to go on</p>') + err +
@@ -2087,8 +2095,10 @@
         difficulty: Number(get('q-diff')) || 2,
         q: get('q-text'),
         answer: get('q-answer'),
-        wrong: [get('q-wrong-1'), get('q-wrong-2'), get('q-wrong-3')]
+        wrong: [get('q-wrong-1'), get('q-wrong-2'), get('q-wrong-3')],
+        why: get('q-why')
       };
+      if (!q.why) delete q.why;
       var all = [q.answer].concat(q.wrong).map(function (x) { return x.toLowerCase(); });
       if (!q.q || !q.answer || q.wrong.some(function (w) { return !w; })) {
         state.bankError = 'Fill in the question, the right answer and all three wrong answers.';

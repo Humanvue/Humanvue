@@ -121,7 +121,7 @@ window.TRIVIA_QUESTIONS = [
   { id: 'ph8', category: 'philosophy', q: 'Utilitarianism, "the greatest good for the greatest number," is most tied to which thinker?', answer: 'John Stuart Mill', wrong: ['Immanuel Kant', 'Friedrich Nietzsche', 'Thomas Aquinas'] },
 
   // Film & TV
-  { id: 'f1', category: 'film', q: 'Which 1994 movie features the line "Life is like a box of chocolates"?', answer: 'Forrest Gump', wrong: ['The Shawshank Redemption', 'Pulp Fiction', 'The Lion King'] },
+  { id: 'f1', category: 'film', q: 'Which 1994 movie features the line "Life was like a box of chocolates"?', answer: 'Forrest Gump', wrong: ['The Shawshank Redemption', 'Pulp Fiction', 'The Lion King'] },
   { id: 'f2', category: 'film', q: 'Who directed "Jurassic Park" (1993)?', answer: 'Steven Spielberg', wrong: ['James Cameron', 'George Lucas', 'Ridley Scott'] },
   { id: 'f3', category: 'film', q: 'In "Breaking Bad," what subject does Walter White teach?', answer: 'Chemistry', wrong: ['Biology', 'Physics', 'Math'] },
   { id: 'f4', category: 'film', q: 'Which 1999 movie has a choice between a red pill and a blue pill?', answer: 'The Matrix', wrong: ['Fight Club', 'The Sixth Sense', 'Office Space'] },
@@ -224,7 +224,7 @@ window.TRIVIA_QUESTIONS = [
   { id: 'n119', category: 'nursing', difficulty: 2, q: 'Which medication reverses an opioid overdose?', answer: 'Naloxone', wrong: ['Flumazenil', 'Atropine', 'Epinephrine'] },
   { id: 'n120', category: 'nursing', difficulty: 2, q: 'Which heart chamber pumps oxygenated blood out to the body?', answer: 'Left ventricle', wrong: ['Right ventricle', 'Left atrium', 'Right atrium'] },
   { id: 'n121', category: 'nursing', difficulty: 2, q: 'Which position has the patient sitting upright with the head of the bed at about 90 degrees?', answer: 'High Fowler\'s', wrong: ['Trendelenburg', 'Sims\'', 'Lithotomy'] },
-  { id: 'n122', category: 'nursing', difficulty: 2, q: 'Which position has the patient lying flat with the feet raised higher than the head?', answer: 'Trendelenburg', wrong: ['Sims\'', 'Fowler\'s', 'Prone'] },
+  { id: 'n122', category: 'nursing', difficulty: 2, q: 'Which position tilts the whole bed so the patient\'s head is lower than the feet?', answer: 'Trendelenburg', wrong: ['Sims\'', 'Fowler\'s', 'Prone'] },
   { id: 'n123', category: 'nursing', difficulty: 2, q: 'During infant CPR, which pulse should be checked?', answer: 'Brachial', wrong: ['Carotid', 'Radial', 'Popliteal'] },
   { id: 'n124', category: 'nursing', difficulty: 2, q: 'What does the abbreviation MRSA stand for?', answer: 'Methicillin-resistant Staphylococcus aureus', wrong: ['Methicillin-resistant Streptococcus A', 'Methicillin-reactive Staphylococcus aureus', 'Macrolide-resistant Staphylococcus aureus'] },
   { id: 'n125', category: 'nursing', difficulty: 2, q: 'A patient with active pulmonary tuberculosis requires which type of precautions?', answer: 'Airborne', wrong: ['Contact', 'Droplet', 'Standard only'] },
