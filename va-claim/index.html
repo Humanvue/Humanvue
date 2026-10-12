@@ -17,6 +17,7 @@
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
   --r:6px;
+  --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#6250d6;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#141815; --surface:#1c211d; --surface-2:#252b26; --line:#343c35;
@@ -25,6 +26,7 @@
   --duty:#9bb86a; --duty-bg:#26301b; --duty-ink:#bcd48f;
   --study:#6cb6e3; --study-bg:#16293a; --study-ink:#9fd0ef;
   --good:#6cc28f; --warn:#e3a640; --bad:#ef7d6f; --warn-bg:#33270f; --bad-bg:#3a1c18;
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;
   color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#141815; --surface:#1c211d; --surface-2:#252b26; --line:#343c35;
@@ -33,6 +35,7 @@
   --duty:#9bb86a; --duty-bg:#26301b; --duty-ink:#bcd48f;
   --study:#6cb6e3; --study-bg:#16293a; --study-ink:#9fd0ef;
   --good:#6cc28f; --warn:#e3a640; --bad:#ef7d6f; --warn-bg:#33270f; --bad-bg:#3a1c18;
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;
   color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;margin:0}
@@ -155,6 +158,24 @@ a{color:var(--study)}
 .pl-row.duty{border-left-color:var(--duty)}.pl-row.study{border-left-color:var(--study)}.pl-row .amt{font-variant-numeric:tabular-nums;font-weight:600}
 details.panel>summary{cursor:pointer}
 .panel-in{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--surface-2)}
+.tgl{cursor:pointer}.tgl input{margin-top:4px;accent-color:var(--accent);width:18px;height:18px;flex:none}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.tile{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface-2)}
+.tbig{font-family:var(--f-display);font-weight:700;font-size:1.8rem;line-height:1.1;font-variant-numeric:tabular-nums}
+.warnbox{background:var(--warn-bg);border-left:4px solid var(--warn);padding:8px 10px;border-radius:6px}
+.chart-wrap{position:relative}.viz{width:100%;height:auto;display:block;overflow:visible}
+.viz .grid{stroke:var(--line);stroke-width:1}.viz .zero{stroke:var(--ink-3);stroke-width:1}.viz .axl{stroke:var(--ink-3)}
+.viz .ax{fill:var(--ink-3);font:11px var(--f-mono)}.viz .lab{fill:var(--ink-2);font:12px var(--f-body)}
+.viz .area{stroke:var(--surface);stroke-width:1.5;stroke-linejoin:round}.viz .ghost{fill:var(--line)}.viz .ln{fill:none;stroke-width:2;stroke-linejoin:round}
+.viz .evl{stroke-width:1.5;stroke-dasharray:3 3;stroke:var(--ink-3)}.viz .evl.duty{stroke:var(--duty)}.viz .evl.study{stroke:var(--study)}
+.viz .evc{fill:var(--accent);stroke:var(--surface);stroke-width:2}.viz .evc.duty{fill:var(--duty)}.viz .evc.study{fill:var(--study)}
+.viz .evn{fill:#fff;font:600 10px var(--f-mono);pointer-events:none}.viz .hit{fill:transparent;cursor:crosshair}.viz .xh{stroke:var(--ink-2);stroke-width:1}
+.viz [data-tip]{cursor:pointer}.viz .gapfill{fill:var(--s1);opacity:.15}
+.tip{position:absolute;z-index:5;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:.8rem;box-shadow:0 4px 14px rgba(0,0,0,.15);pointer-events:none;max-width:260px}
+.tip .tr{display:grid;grid-template-columns:10px 1fr auto;gap:6px;align-items:center}.tip i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.8rem;color:var(--ink-2)}.lg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.evs{list-style:none;padding:0;margin:0;display:grid;gap:8px}.ev{display:grid;grid-template-columns:24px 1fr;gap:10px;padding:8px 10px;border-left:4px solid var(--accent);background:var(--surface-2);border-radius:6px}
+.ev.duty{border-left-color:var(--duty)}.ev.study{border-left-color:var(--study)}
+.evb{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font:600 11px var(--f-mono);display:grid;place-items:center}.ev.duty .evb{background:var(--duty)}.ev.study .evb{background:var(--study)}
 .pl-row.off{opacity:.5}.pl-row.tot{border-left-color:var(--accent)}
 .pos{color:var(--good)}.neg{color:var(--bad)}
 .path-row{display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 0}
@@ -298,7 +319,7 @@ function progress(){
 }
 
 /* ---------- Tabs ---------- */
-const TABS=[['dash','Dashboard'],['steps','Steps'],['me','About me'],['conds','Conditions'],['scan','Scan records'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['calc','Calculator'],['backup','Backup & help']];
+const TABS=[['dash','Dashboard'],['steps','Steps'],['me','About me'],['conds','Conditions'],['scan','Scan records'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['calc','Calculator'],['debt','Debt plan'],['backup','Backup & help']];
 function renderTabs(){
   $('#tabs').innerHTML=TABS.map(([id,n])=>`<button role="tab" id="tab-${id}" aria-selected="${S.tab===id}" data-tab="${id}">${n}</button>`).join('');
 }
@@ -916,7 +937,7 @@ function planResult(R,over){
   if(fica)out.push({k:'Social Security and Medicare tax',v:M(fica),note:'7.65% of the salary'});
   out.push(retired?{k:'Medicare Part B',v:Math.round(PART_B),note:'Required to keep TRICARE For Life, which then costs nothing'}:{k:'TRICARE Select',v:Math.round(TRICARE_SELECT/12),note:`Retiree Group A, ${money(TRICARE_SELECT)} a year in 2026. Prime is $381.96.`});
   const inc=L.reduce((a,b)=>a+b.v,0),ded=out.reduce((a,b)=>a+b.v,0),net=inc-ded;
-  const B=P.budget,spend=B?B.groups.reduce((a,g)=>a+(V.debt==='paid'&&g.debt?0:g.v),0):0;
+  const B=P.budget,spend=B?B.groups.reduce((a,g)=>a+((V.debt==='paid'&&g.debt)||(V.off&&V.off[g.k])?0:g.v),0):0;
   return{P,V,O,mult,retGross,ret,va,vaPct,crdp,L,out,inc,ded,net,spend,left:net-spend};
 }
 function planPath(R){ // phases of your career, using the selected date, job, city and VA view
@@ -942,8 +963,7 @@ function vPlan(R){
      <div class="small amt">${money0(p.net)}/mo<br><span class="muted">${money0(p.net*12)}/yr</span>${B?`<br><span class="${p.left>=0?'pos':'neg'}">${p.left>=0?'+':'−'}${money0(Math.abs(p.left*12))}/yr left</span>`:''}</div></div>`).join('');
   const bud=B?`<div class="panel-in stack"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><div class="eyebrow-s">Your spending vs take-home</div><span class="small muted">${esc(B.source)}</span></div>
      ${seg('debt',[['now','Debts as they are now'],['paid','Debts paid off']])}
-     <div class="pl-list">${B.groups.map(g=>`<div class="pl-row ${g.debt&&V.debt==='paid'?'off':''}"><div><b>${esc(g.k)}</b>${g.note?`<div class="small muted">${esc(g.note)}</div>`:''}</div><div class="amt">${g.debt&&V.debt==='paid'?'<s>'+money0(g.v)+'</s>':money0(g.v)}</div></div>`).join('')}
-      <div class="pl-row tot"><div><b>Spending a month</b></div><div class="amt">${money0(X.spend)}<div class="small muted">${money0(X.spend*12)}/yr</div></div></div>
+     ${budgetToggles(B)}<div class="pl-list"><div class="pl-row tot"><div><b>Spending a month</b></div><div class="amt">${money0(X.spend)}<div class="small muted">${money0(X.spend*12)}/yr</div></div></div>
       <div class="pl-row tot"><div><b>Left over a month</b><div class="small muted">Take-home ${money0(X.net)} minus spending</div></div><div class="amt ${X.left>=0?'pos':'neg'}">${X.left>=0?'':'−'}${money0(Math.abs(X.left))}<div class="small">${X.left>=0?'':'−'}${money0(Math.abs(X.left*12))}/yr</div></div></div></div>
      <p class="small">Today you take home about ${money0(B.nowIncome)} a month and spend ${money0(B.nowSpend)}, so you are short about ${money0(B.nowSpend-B.nowIncome)} a month. ${esc(B.tip)}</p></div>`:'';
   return `<div class="panel stack"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3>Retirement income planner</h3><span class="small muted">Monthly, in today's dollars</span></div>
@@ -1013,9 +1033,165 @@ function vDnp(R){
    ${D.scholarships?`<div class="stack"><div class="eyebrow-s">Scholarships and loan help to apply for</div><ul class="small">${D.scholarships.map(x=>`<li><b>${esc(x.name)}</b>: ${esc(x.what)}${x.when?` <span class="muted">${esc(x.when)}</span>`:''}</li>`).join('')}</ul></div>`:''}
    <p class="small muted">${esc(D.notes)}</p></div>`;
 }
-function bindPlan(){document.querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{planView()[b.dataset.pv]=b.dataset.val;save();render();});}
+/* ---------- Debt plan: payoff dates, which debt first, pay down vs invest (personal numbers come from S.plan.debts) ---------- */
+const DEBT_YEARS=14,INVEST_RATE=.07;
+function segBtns(V,key,opts){return `<div class="seg" role="group">${opts.map(([v,n])=>`<button class="btn sm ${V[key]===v?'on':''}" data-pv="${key}" data-val="${v}" aria-pressed="${V[key]===v}">${n}</button>`).join('')}</div>`;}
+function offSet(){const V=planView();V.off=V.off||{};return V.off;}
+function budgetToggles(B,opts){ // one switch per expense; off expenses drop out of every total
+  const off=offSet(),o=opts||{};
+  return `<div class="pl-list">${B.groups.filter(g=>!(o.skipDebt&&g.debt)).map(g=>{const isOff=!!off[g.k]||(!o.skipDebt&&g.debt&&planView().debt==='paid');
+    return `<label class="pl-row tgl ${isOff?'off':''}"><div class="row" style="gap:10px;align-items:flex-start;flex-wrap:nowrap"><input type="checkbox" data-poff="${esc(g.k)}" ${off[g.k]?'':'checked'} ${!o.skipDebt&&g.debt&&planView().debt==='paid'?'disabled':''} aria-label="Count ${esc(g.k)}"><div><b>${esc(g.k)}</b>${g.note?`<div class="small muted">${esc(g.note)}</div>`:''}</div></div><div class="amt">${isOff?'<s>'+money0(g.v)+'</s>':money0(g.v)}</div></label>`;}).join('')}</div>`;
+}
+function nonDebtSpend(){const B=S.plan.budget,off=offSet();return B.groups.reduce((a,g)=>a+(g.debt||off[g.k]?0:g.v),0);}
+const ym=i=>`${MON[i%12]} ${Math.floor(i/12)}`;
+const ymIdx=s=>{const [y,m]=s.split('-').map(Number);return y*12+m-1;};
+function debtIncome(R){ // take-home for each month of the plan, from the same toggles as the calculator
+  const V=planView(),P=S.plan,start=ymIdx(P.debtStart),rm=ymIdx(V.date.slice(0,7)),npStart=ymIdx(P.npStart||'2030-07');
+  const cache={},net=o=>{const k=o.job+o.stage;return cache[k]??=planResult(R,o).net;};
+  return Array.from({length:DEBT_YEARS*12},(_,t)=>{const i=start+t;if(i<=rm)return P.budget.nowIncome;
+    return net({job:V.job==='np'&&i>=npStart?'np':'rn',stage:i-rm<=12?'start':'exp'});});
+}
+function simDebts(R,o,INC){ // o.strat: min | aval | snow | first ; o.first: id ; o.extra: none | half | all ; o.invest: put spare money in investments
+  const P=S.plan,start=ymIdx(P.debtStart),base=nonDebtSpend();
+  const D=P.debts.map(d=>({...d,b:d.bal,int:0,end:null}));const totMin=D.reduce((a,d)=>a+d.pay,0);
+  const order=()=>{const live=D.filter(d=>d.b>.5);
+    if(o.strat==='snow')return live.sort((a,b)=>a.b-b.b);
+    const av=live.sort((a,b)=>b.apr-a.apr||a.b-b.b);
+    if(o.strat==='first'){const f=av.find(d=>d.id===o.first);return f?[f,...av.filter(d=>d!==f)]:av;}
+    return av;};
+  let inv=0,cash=0,totInt=0,free=null,short=0;const rows=[];
+  for(let t=0;t<INC.length;t++){
+    D.forEach(d=>{if(d.b>0){const i=d.b*d.apr/12;d.b+=i;d.int+=i;totInt+=i;}});
+    const spare=INC[t]-base-totMin;let extra=spare>0?(o.extra==='all'?spare:o.extra==='half'?spare/2:0):0;
+    let budget=o.strat==='min'?0:totMin+extra,paid=0;
+    D.forEach(d=>{if(d.b>0){const p=Math.min(d.pay,d.b);d.b-=p;paid+=p;}});
+    if(o.strat!=='min'){let room=budget-paid;for(const d of order()){if(room<=0)break;const p=Math.min(room,d.b);d.b-=p;paid+=p;room-=p;}}
+    else extra=0;
+    D.forEach(d=>{if(d.b<=.5&&d.end===null){d.b=0;d.end=start+t;}});
+    let left=INC[t]-base-paid; // what is left after living costs and debt payments
+    if(left<0){const c=D.find(d=>d.id===P.shortfallTo)||D[0];c.b+=-left;if(c.end!==null)c.end=null;short+=-left;left=0;}
+    if(o.invest)inv=inv*(1+INVEST_RATE/12)+left;else cash+=left;
+    const debt=D.reduce((a,d)=>a+d.b,0);if(free===null&&debt<=.5)free=start+t;
+    rows.push({i:start+t,bal:D.map(d=>d.b),debt,inv,cash,net:inv+cash-debt});
+  }
+  return{D,rows,totInt,free,short,start};
+}
+const niceStep=x=>{const p=Math.pow(10,Math.floor(Math.log10(x))),f=x/p;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p;};
+const fmtK=n=>Math.abs(n)>=1000?`$${(n/1000).toFixed(Math.abs(n)>=100000?0:1)}k`:money0(n);
+const sgn=n=>`${n<0?'−':''}${money0(Math.abs(n))}`;
+function chartFrame(w,h,pad,ymax,ticks,xa,xb){ // y grid + x year labels
+  const X=i=>pad.l+(i-xa)/(xb-xa)*(w-pad.l-pad.r),Y=v=>h-pad.b-v/ymax*(h-pad.t-pad.b);let g='';
+  for(let k=0;k<=ticks;k++){const v=ymax*k/ticks;g+=`<line x1="${pad.l}" x2="${w-pad.r}" y1="${Y(v)}" y2="${Y(v)}" class="grid"/><text x="${pad.l-6}" y="${Y(v)+4}" class="ax" text-anchor="end">${fmtK(v)}</text>`;}
+  for(let y=Math.ceil(xa/12);y*12<=xb;y++){const x=X(y*12);g+=`<text x="${x}" y="${h-pad.b+16}" class="ax" text-anchor="middle">${y}</text><line x1="${x}" x2="${x}" y1="${h-pad.b}" y2="${h-pad.b+4}" class="axl"/>`;}
+  return{X,Y,g};
+}
+const CHARTS={};
+function vDebt(){
+  const R=calcResult(),P=S.plan;
+  if(!P||!P.debts||!P.budget)return `<div class="panel stack"><h3>Debt plan</h3><p class="small muted">Restore your Claim Kit backup (Backup & help) to load your debts and budget.</p></div>`;
+  const V=planView();V.dstrat=V.dstrat||'aval';V.dextra=V.dextra||'half';
+  const INC=debtIncome(R),plan=simDebts(R,{strat:V.dstrat,extra:V.dextra},INC),mins=simDebts(R,{strat:'min',extra:'none'},INC);
+  const payInv=simDebts(R,{strat:V.dstrat,extra:V.dextra,invest:true},INC),invInst=simDebts(R,{strat:'min',extra:'none',invest:true},INC);
+  const firsts=P.debts.filter(d=>d.bal>0).map(d=>{const s=simDebts(R,{strat:'first',first:d.id,extra:V.dextra==='none'?'half':V.dextra},INC);return{d,s,saved:mins.totInt-s.totInt};}).sort((a,b)=>a.s.totInt-b.s.totInt||(a.s.free??9e9)-(b.s.free??9e9));
+  const start=plan.start,end=Math.min(start+INC.length-1,Math.max(plan.free??start+INC.length-1,start+36)+6);
+  const col=k=>`var(--s${k+1})`,W=Math.round(Math.max(300,Math.min(640,(document.querySelector('#main')?.clientWidth||660)-58))),nar=W<480;
+  // decision points on the time line
+  const rm=ymIdx(V.date.slice(0,7)),ev=[];
+  (P.debtEvents||[]).forEach(e=>{const i=e.at==='retire'?rm:e.at==='retire+1'?rm+1:ymIdx(e.at);ev.push({i,side:e.side||'plain',t:e.title,x:e.text});});
+  let rolled=0;
+  plan.D.filter(d=>d.end!==null&&d.bal>0).sort((a,b)=>a.end-b.end).forEach(d=>{rolled+=d.pay;const last=plan.free===d.end;
+    ev.push({i:d.end,side:'plain',t:`${d.name} paid off`,x:last?`You're debt free. The ${money0(rolled)} a month you were paying on debts can go to investing. At ${Math.round(INVEST_RATE*100)}% a year, ${money0(rolled)} a month for 10 years grows to about ${money0(rolled*((Math.pow(1+INVEST_RATE/12,120)-1)/(INVEST_RATE/12)))}.`
+      :V.dstrat==='min'?`Its ${money0(d.pay)} payment is now free money. Put it toward the highest-rate debt left, or into your emergency fund.`:`Its ${money0(d.pay)} payment rolls into the next debt, so you now put ${money0(rolled)} a month toward the next one.`});});
+  ev.sort((a,b)=>a.i-b.i);const evIn=ev.filter(e=>e.i>=start&&e.i<=end);
+  // chart 1: balances, stacked
+  const w=W,h=nar?220:260,pad={t:12,r:12,b:26,l:48},ymax=Math.ceil(Math.max(...plan.rows.slice(0,end-start+1).map(r=>r.debt))/10000)*10000||10000;
+  const F=chartFrame(w,h,pad,ymax,4,start,end);let areas='';const NR=plan.rows.slice(0,end-start+1);
+  const lowerOf=k=>NR.map(r=>r.bal.slice(0,k).reduce((a,b)=>a+b,0));
+  for(let k=P.debts.length-1;k>=0;k--){const lo=lowerOf(k),hi=NR.map((r,j)=>lo[j]+r.bal[k]);if(Math.max(...NR.map(r=>r.bal[k]))<1)continue;
+    const pts=hi.map((v,j)=>`${F.X(start+j).toFixed(1)},${F.Y(v).toFixed(1)}`).join(' ')+' '+lo.map((v,j)=>`${F.X(start+j).toFixed(1)},${F.Y(v).toFixed(1)}`).reverse().join(' ');
+    areas+=`<polygon points="${pts}" style="fill:${col(k)}" class="area"/>`;}
+  const marks=evIn.map((e,n)=>`<line x1="${F.X(e.i)}" x2="${F.X(e.i)}" y1="${pad.t}" y2="${h-pad.b}" class="evl ${e.side}"/><circle cx="${F.X(e.i)}" cy="${pad.t+9+(n%3)*16}" r="8" class="evc ${e.side}"/><text x="${F.X(e.i)}" y="${pad.t+13+(n%3)*16}" class="evn" text-anchor="middle">${n+1}</text>`).join('');
+  CHARTS.bal={start,end,pad,w,rows:NR.map(r=>({lab:ym(r.i),vals:P.debts.map((d,k)=>[d.name,r.bal[k],col(k)]).filter(v=>v[1]>.5),tot:r.debt}))};
+  const legend=P.debts.map((d,k)=>`<span class="lg"><i style="background:${col(k)}"></i>${esc(d.name)}</span>`).join('');
+  // chart 2: payoff dates
+  const gEnd=Math.max(end,...mins.D.map(d=>d.end??start+INC.length-1)),gw=W,rowH=30,gpad={t:6,r:nar?70:84,b:26,l:nar?92:150},gh=gpad.t+gpad.b+rowH*P.debts.length;
+  const GX=i=>gpad.l+(i-start)/(gEnd-start)*(gw-gpad.l-gpad.r);let gg='';
+  for(let y=Math.ceil(start/12);y*12<=gEnd;y++)if(!nar||(gEnd-start)<72||y%2===0)gg+=`<line x1="${GX(y*12)}" x2="${GX(y*12)}" y1="${gpad.t}" y2="${gh-gpad.b}" class="grid"/><text x="${GX(y*12)}" y="${gh-gpad.b+16}" class="ax" text-anchor="middle">${y}</text>`;
+  P.debts.forEach((d,k)=>{const y=gpad.t+k*rowH,e1=plan.D[k].end,e0=mins.D[k].end;
+    gg+=`<text x="${gpad.l-8}" y="${y+19}" class="lab" text-anchor="end">${esc(d.short||d.name)}</text>`;
+    gg+=`<rect x="${GX(start)}" y="${y+6}" width="${Math.max(3,GX(e0??gEnd)-GX(start))}" height="18" rx="4" class="ghost"/>`;
+    gg+=`<rect x="${GX(start)}" y="${y+9}" width="${Math.max(3,GX(e1??gEnd)-GX(start))}" height="12" rx="4" style="fill:${col(k)}" data-tip="${esc(d.name)}: ${e1!==null?ym(e1):'not paid off by '+Math.floor(gEnd/12)} with this plan, ${e0!==null?ym(e0):'not by '+Math.floor(gEnd/12)} paying minimums"/>`;
+    gg+=`<text x="${GX(e1??gEnd)+6}" y="${y+19}" class="lab">${e1!==null?ym(e1):'later'}</text>`;});
+  // chart 3: which debt first
+  const bestInt=firsts[0].s.totInt,fmax=Math.max(1,...firsts.map(f=>f.s.totInt-bestInt)),fw=W,fpad={t:6,r:nar?92:130,b:8,l:nar?92:150},fh=fpad.t+fpad.b+firsts.length*30;let fg='';
+  firsts.forEach((f,n)=>{const y=fpad.t+n*30,k=P.debts.indexOf(f.d),more=f.s.totInt-bestInt,wd=n===0?0:Math.max(3,(fw-fpad.l-fpad.r)*more/fmax);
+    fg+=`<text x="${fpad.l-8}" y="${y+19}" class="lab" text-anchor="end">${esc(f.d.short||f.d.name)}</text>${n===0?'':`<rect x="${fpad.l}" y="${y+7}" width="${wd}" height="14" rx="4" style="fill:${col(k)}" data-tip="Paying ${esc(f.d.name)} first: ${money0(more)} more interest than the best order, ${money0(f.saved)} less than minimums, debt free ${f.s.free!==null?ym(f.s.free):'later'}"/>`}<text x="${fpad.l+wd+(n===0?0:6)}" y="${y+19}" class="lab">${n===0?'Best: least interest':more<1?'Same as best':'+'+money0(more)}</text>`;});
+  fg+=`<line x1="${fpad.l}" x2="${fpad.l}" y1="${fpad.t}" y2="${fh-fpad.b}" class="zero"/>`;
+  const quick=plan.D.filter(d=>d.end!==null&&d.bal>0).sort((a,b)=>a.end-b.end).slice(0,3).map(d=>`${esc(d.short||d.name)} (${ym(d.end)}, frees ${money0(d.pay)} a month)`).join(', ');
+  // chart 4: pay down vs invest
+  const nEnd=Math.min(INC.length-1,ymIdx(P.compareTo||'2036-12')-start),A=payInv.rows.slice(0,nEnd+1),Bv=invInst.rows.slice(0,nEnd+1);
+  const G=A.map((r,j)=>r.net-Bv[j].net),gmax0=Math.max(0,...G),gmin0=Math.min(0,...G),stp=niceStep((gmax0-gmin0)/4||1),nmin=Math.floor(gmin0/stp)*stp,nmax=Math.max(nmin+stp,Math.ceil(gmax0/stp)*stp),nw=W,nh=220,np={t:12,r:12,b:26,l:52};
+  const NX=j=>np.l+j/nEnd*(nw-np.l-np.r),NY=v=>nh-np.b-(v-nmin)/(nmax-nmin)*(nh-np.t-np.b);let ng='';
+  for(let v=nmin;v<=nmax+1;v+=stp)ng+=`<line x1="${np.l}" x2="${nw-np.r}" y1="${NY(v)}" y2="${NY(v)}" class="${Math.abs(v)<1?'zero':'grid'}"/><text x="${np.l-6}" y="${NY(v)+4}" class="ax" text-anchor="end">${v<0?'−':''}${fmtK(Math.abs(v))}</text>`;
+  for(let y=Math.ceil(start/12);y*12<=start+nEnd;y++)if(!nar||y%2===0)ng+=`<text x="${NX(y*12-start)}" y="${nh-np.b+16}" class="ax" text-anchor="middle">${y}</text>`;
+  ng+=`<polygon points="${NX(0)},${NY(0)} ${G.map((v,j)=>`${NX(j).toFixed(1)},${NY(v).toFixed(1)}`).join(' ')} ${NX(nEnd)},${NY(0)}" class="gapfill"/><polyline points="${G.map((v,j)=>`${NX(j).toFixed(1)},${NY(v).toFixed(1)}`).join(' ')}" class="ln" style="stroke:var(--s1)"/>`;
+  CHARTS.nw={start,end:start+nEnd,pad:np,w:nw,rows:A.map((r,j)=>({lab:ym(r.i),vals:[['Ahead by paying down first',G[j],'var(--s1)'],['Worth, paying down first',r.net,'transparent'],['Worth, investing instead',Bv[j].net,'transparent']]}))};
+  const nA=A[A.length-1].net,nB=Bv[Bv.length-1].net;
+  // stat tiles
+  const best=firsts[0],stratName={min:'minimums only',aval:'highest rate first',snow:'smallest balance first'}[V.dstrat];
+  const tile=(lab,big,sub)=>`<div class="tile"><div class="eyebrow-s">${lab}</div><div class="tbig">${big}</div><div class="small muted">${sub}</div></div>`;
+  const evList=evIn.map((e,n)=>`<li class="ev ${e.side}"><span class="evb">${n+1}</span><div><b>${ym(e.i)}: ${esc(e.t)}</b><div class="small">${esc(e.x)}</div></div></li>`).join('');
+  const tbl=P.debts.map((d,k)=>`<tr><td>${esc(d.name)}${d.est?' <span class="muted small">(estimate)</span>':''}</td><td>${money0(d.bal)}</td><td>${(d.apr*100).toFixed(2)}%</td><td>${money0(d.pay)}</td><td>${mins.D[k].end!==null?ym(mins.D[k].end):'later'}</td><td>${plan.D[k].end!==null?ym(plan.D[k].end):'later'}</td><td>${money0(plan.D[k].int)}</td></tr>`).join('');
+  return `<div class="stack"><div class="panel stack"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3>Debt plan</h3><span class="small muted">Starts ${ym(start)}, monthly</span></div>
+   <p class="small">These toggles are shared with the Calculator tab, so a change here changes both.</p>
+   <div class="stack" style="gap:8px">
+    <div><div class="eyebrow-s">Retire from AGR</div>${segBtns(V,'date',Object.entries(P.options).map(([d,o])=>[d,o.label]))}</div>
+    <div><div class="eyebrow-s">Nursing job</div>${segBtns(V,'job',[['rn','BSN RN'],['np','PMHNP, DNP']])}</div>
+    <div><div class="eyebrow-s">City</div>${segBtns(V,'city',[['tc','Twin Cities'],['roch','Rochester']])}</div>
+    <div><div class="eyebrow-s">VA rating</div>${segBtns(V,'va',[['est',`My estimate (${R.rounded}%)`],['70','70%'],['100','100%']])}</div>
+    <div><div class="eyebrow-s">Payoff order</div>${segBtns(V,'dstrat',[['aval','Highest rate first'],['snow','Smallest balance first'],['min','Minimums only']])}</div>
+    ${V.dstrat==='min'?'':`<div><div class="eyebrow-s">Extra toward debt</div>${segBtns(V,'dextra',[['none','None'],['half','Half of what is left over'],['all','All of what is left over']])}</div>`}
+   </div>
+   <div class="tiles">${tile('Debt free',plan.free!==null?ym(plan.free):'Not by '+Math.floor((start+INC.length)/12),`${stratName}${mins.free!==null&&plan.free!==null&&mins.free>plan.free?`, ${Math.round((mins.free-plan.free)/12*10)/10} years sooner than minimums`:''}`)}
+    ${tile('Interest you pay',money0(plan.totInt),V.dstrat==='min'?'paying minimums':`${money0(mins.totInt-plan.totInt)} less than minimums`)}
+    ${tile('Worth by '+(P.compareTo||'2036-12').slice(0,4),sgn(nA),V.dstrat==='min'?'investments minus debts':`${nA>=nB?sgn(nA-nB)+' more':sgn(nB-nA)+' less'} than investing instead`)}</div>
+   ${plan.short>0?`<p class="small warnbox">Until your income rises, spending plus debt payments is more than you take home. This plan adds that gap, about ${money0(plan.short)} in total, to your ${esc((P.debts.find(d=>d.id===P.shortfallTo)||P.debts[0]).name)}. Turning off expenses below shrinks it.</p>`:''}
+  </div>
+  <div class="panel stack"><div class="eyebrow-s">What you owe over time</div>
+   <div class="chart-wrap" data-chart="bal"><svg viewBox="0 0 ${w} ${h}" class="viz" role="img" aria-label="Debt balances over time, stacked by debt">${F.g}${areas}${marks}<line class="xh" x1="0" x2="0" y1="${pad.t}" y2="${h-pad.b}" style="display:none"/><rect class="hit" x="${pad.l}" y="${pad.t}" width="${w-pad.l-pad.r}" height="${h-pad.t-pad.b}"/></svg><div class="tip" hidden></div></div>
+   <div class="legend">${legend}</div>
+   <div class="eyebrow-s" style="margin-top:6px">Decision points</div><ol class="evs">${evList}</ol></div>
+  <div class="panel stack"><div class="eyebrow-s">When each debt ends</div>
+   <div class="chart-wrap"><svg viewBox="0 0 ${gw} ${gh}" class="viz" role="img" aria-label="Payoff date for each debt">${gg}</svg><div class="tip" hidden></div></div>
+   <p class="small muted">Solid bars are this plan. The pale bar behind each one is minimum payments only.</p></div>
+  <div class="panel stack"><div class="eyebrow-s">Which debt to pay first</div>
+   <div class="chart-wrap"><svg viewBox="0 0 ${fw} ${fh}" class="viz" role="img" aria-label="Interest saved by paying each debt first">${fg}</svg><div class="tip" hidden></div></div>
+   <p class="small"><b>Start with ${esc(best.d.name)}.</b> Paying it first, then the rest from highest rate down, costs the least interest: ${money0(best.saved)} less than minimums, debt free ${best.s.free!==null?ym(best.s.free):'later'}. Each bar shows how much more interest you'd pay by starting with that debt instead. Cards at 21% to 27% cost the most for every month they stay open. The ones that free up cash soonest with this plan: ${quick}.</p></div>
+  <div class="panel stack"><div class="eyebrow-s">Pay debts down first, or invest instead?</div>
+   <div class="chart-wrap" data-chart="nw"><svg viewBox="0 0 ${nw} ${nh}" class="viz" role="img" aria-label="How far ahead paying debts down first puts you, over time">${ng}<line class="xh" x1="0" x2="0" y1="${np.t}" y2="${nh-np.b}" style="display:none"/><rect class="hit" x="${np.l}" y="${np.t}" width="${nw-np.l-np.r}" height="${nh-np.t-np.b}"/></svg><div class="tip" hidden></div></div>
+   <p class="small">The line shows how far ahead you are by paying debts down first and then investing, compared with paying minimums and investing the rest. Both choices spend the same money each month. Worth is investments minus what you still owe, assuming investments grow ${Math.round(INVEST_RATE*100)}% a year on average (not guaranteed). Paying off a card at 21% to 27% is a sure 21% to 27% return, which beats the market's average. That's why paying down first ends ${nA>=nB?'ahead':'behind'} by ${sgn(Math.abs(nA-nB))} in ${(P.compareTo||'2036-12').slice(0,4)}. The one exception: always put in enough to get an employer 401(k) or 403(b) match, which is an instant 50% to 100% return.</p></div>
+  <div class="panel stack"><div class="eyebrow-s">Your monthly expenses (turn off any you could cut)</div>
+   ${budgetToggles(P.budget,{skipDebt:true})}
+   <p class="small muted">Debt payments are modeled one by one above, so the budget's debt line is left out here. Living costs counted: ${money0(nonDebtSpend())} a month.</p>
+   <details><summary class="small"><b>Table view of your debts</b></summary><div class="tbl-wrap"><table class="mtbl"><thead><tr><th>Debt</th><th>Owed now</th><th>Rate</th><th>Payment</th><th>Ends, minimums</th><th>Ends, this plan</th><th>Interest, this plan</th></tr></thead><tbody>${tbl}</tbody></table></div>
+   <p class="small muted">${esc(P.debtNote||'')}</p></details></div></div>`;
+}
+function bindDebt(){bindPlan();bindCharts();}
+function bindCharts(){
+  document.querySelectorAll('.chart-wrap').forEach(wr=>{const tip=wr.querySelector('.tip'),svg=wr.querySelector('svg'),C=CHARTS[wr.dataset.chart];
+    if(C){const hit=svg.querySelector('.hit'),xh=svg.querySelector('.xh');
+      const show=ev=>{const r=svg.getBoundingClientRect(),sx=(ev.clientX-r.left)/r.width*C.w;const j=Math.max(0,Math.min(C.rows.length-1,Math.round((sx-C.pad.l)/(C.w-C.pad.l-C.pad.r)*(C.rows.length-1))));
+        const x=C.pad.l+j/(C.rows.length-1)*(C.w-C.pad.l-C.pad.r);xh.setAttribute('x1',x);xh.setAttribute('x2',x);xh.style.display='';const row=C.rows[j];
+        tip.innerHTML=`<b>${row.lab}</b>${row.vals.map(v=>`<div class="tr"><i style="background:${v[2]}"></i><span>${esc(v[0])}</span><b>${sgn(v[1])}</b></div>`).join('')}${row.tot!=null?`<div class="tr"><i></i><span>Total</span><b>${money0(row.tot)}</b></div>`:''}`;
+        tip.hidden=false;const px=x/C.w*r.width;tip.style.left=Math.min(Math.max(0,px+12),r.width-tip.offsetWidth)+'px';tip.style.top='8px';};
+      hit.addEventListener('pointermove',show);hit.addEventListener('pointerdown',show);hit.addEventListener('pointerleave',()=>{tip.hidden=true;xh.style.display='none';});}
+    svg.querySelectorAll('[data-tip]').forEach(m=>{const sh=ev=>{const r=wr.getBoundingClientRect();tip.textContent=m.dataset.tip;tip.hidden=false;tip.style.left=Math.min(Math.max(0,ev.clientX-r.left+10),r.width-tip.offsetWidth)+'px';tip.style.top=Math.max(0,ev.clientY-r.top-40)+'px';};
+      m.addEventListener('pointermove',sh);m.addEventListener('pointerdown',sh);m.addEventListener('pointerleave',()=>tip.hidden=true);});});
+}
+function bindPlan(){document.querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{planView()[b.dataset.pv]=b.dataset.val;save();render();});
+  document.querySelectorAll('[data-poff]').forEach(c=>c.onchange=()=>{const o=offSet();if(c.checked)delete o[c.dataset.poff];else o[c.dataset.poff]=true;save();render();});}
 
-const VIEWS={calc:[vCalc,bindCalc],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup]};
+const VIEWS={calc:[vCalc,bindCalc],debt:[vDebt,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup]};
 function render(){
   if(!VIEWS[S.tab])S.tab='dash';
   renderTabs();renderBanner();
