@@ -1,0 +1,680 @@
+<title>Claim Kit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a field-binder. Sticky tab strip, one working column, dashboard summary first.
+   Color code: duty side = olive (things done through the unit, clinic or base),
+   off-duty side = nursing blue (writing and uploading you can fit around school). */
+:root{
+  --bg:#f3f4f1; --surface:#ffffff; --surface-2:#e9ebe5; --line:#d3d7cc;
+  --ink:#1d2320; --ink-2:#4e5850; --ink-3:#77817a;
+  --accent:#8a6a1f; --accent-ink:#ffffff;
+  --duty:#556b2f; --duty-bg:#e7edda; --duty-ink:#3c4d1f;
+  --study:#1f6f9e; --study-bg:#dcecf6; --study-ink:#154f72;
+  --good:#2f7d4f; --warn:#a86a00; --bad:#b23b2e; --warn-bg:#fbefd6; --bad-bg:#f8e1dd;
+  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141815; --surface:#1c211d; --surface-2:#252b26; --line:#343c35;
+  --ink:#e6e9e3; --ink-2:#b2bab2; --ink-3:#88918a;
+  --accent:#d1a64a; --accent-ink:#1a1405;
+  --duty:#9bb86a; --duty-bg:#26301b; --duty-ink:#bcd48f;
+  --study:#6cb6e3; --study-bg:#16293a; --study-ink:#9fd0ef;
+  --good:#6cc28f; --warn:#e3a640; --bad:#ef7d6f; --warn-bg:#33270f; --bad-bg:#3a1c18;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141815; --surface:#1c211d; --surface-2:#252b26; --line:#343c35;
+  --ink:#e6e9e3; --ink-2:#b2bab2; --ink-3:#88918a;
+  --accent:#d1a64a; --accent-ink:#1a1405;
+  --duty:#9bb86a; --duty-bg:#26301b; --duty-ink:#bcd48f;
+  --study:#6cb6e3; --study-bg:#16293a; --study-ink:#9fd0ef;
+  --good:#6cc28f; --warn:#e3a640; --bad:#ef7d6f; --warn-bg:#33270f; --bad-bg:#3a1c18;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;margin:0}
+.wrap{max-width:960px;margin:0 auto;padding-inline:16px;padding-block:0 64px}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:.01em;text-wrap:balance;margin:0}
+h1{font-size:2rem;line-height:1.05}
+h2{font-size:1.5rem;line-height:1.1}
+h3{font-size:1.15rem}
+p{margin:0}
+.mono{font-family:var(--f-mono);font-size:.85em}
+.muted{color:var(--ink-2)}
+.small{font-size:.85rem}
+.stack{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.grid2>*{min-width:0}
+
+header.top{padding-block:20px 12px;display:flex;flex-wrap:wrap;gap:12px;align-items:end;justify-content:space-between}
+.brand .eyebrow{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.legend{display:flex;gap:8px;flex-wrap:wrap}
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px}
+nav.tabs button{font:600 .95rem var(--f-display);letter-spacing:.06em;text-transform:uppercase;background:none;border:0;color:var(--ink-2);padding:12px 10px 10px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+nav.tabs button:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+section.view{padding-top:20px}
+section.view>.stack{gap:16px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.banner{border-radius:var(--r);padding:12px 14px;background:var(--warn-bg);color:var(--ink);border:1px solid var(--warn);display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.chip{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;font-size:.75rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:999px;white-space:nowrap}
+.chip.duty{background:var(--duty-bg);color:var(--duty-ink)}
+.chip.study{background:var(--study-bg);color:var(--study-ink)}
+.chip.good{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.chip.warn{background:var(--warn-bg);color:var(--warn)}
+.chip.bad{background:var(--bad-bg);color:var(--bad)}
+.chip.plain{background:var(--surface-2);color:var(--ink-2)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.dot.duty{background:var(--duty)}.dot.study{background:var(--study)}
+
+button.btn{font:600 .9rem var(--f-body);padding:8px 14px;border-radius:var(--r);border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+button.btn:hover{border-color:var(--ink-3)}
+button.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.btn.danger{color:var(--bad);border-color:var(--bad)}
+button.btn.sm{padding:4px 10px;font-size:.8rem}
+button.link{background:none;border:0;padding:0;color:var(--study);font:inherit;text-decoration:underline;cursor:pointer}
+
+label.f{display:flex;flex-direction:column;gap:4px;font-size:.85rem;font-weight:600;color:var(--ink-2)}
+label.f .hint{font-weight:400;color:var(--ink-3);font-size:.8rem}
+input[type=text],input[type=date],input[type=email],input[type=tel],select,textarea{font:400 .95rem var(--f-body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;width:100%}
+textarea{min-height:76px;resize:vertical}
+textarea.doc{font-family:var(--f-mono);font-size:.85rem;min-height:320px;line-height:1.55;background:var(--surface)}
+
+/* Dashboard */
+.dash-head{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:center}
+@media (max-width:560px){.dash-head{grid-template-columns:1fr;justify-items:start}}
+.ring{width:132px;height:132px}
+.ring text{font-family:var(--f-display);font-weight:700;fill:var(--ink)}
+.timeline{position:relative;padding-top:6px}
+.tl-bar{position:relative;height:10px;border-radius:5px;background:var(--surface-2);margin:34px 0 34px}
+.tl-win{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--duty) 45%,transparent);border-radius:5px}
+.tl-mark{position:absolute;top:-6px;width:2px;height:22px;background:var(--ink-3)}
+.tl-mark.today{background:var(--accent);width:3px}
+.tl-lab{position:absolute;font-size:.72rem;white-space:nowrap;transform:translateX(-50%);color:var(--ink-2);font-variant-numeric:tabular-nums}
+.tl-lab.up{top:-30px}.tl-lab.down{top:18px}
+.tl-lab b{color:var(--ink);font-weight:600}
+.phase-row{display:grid;grid-template-columns:150px 1fr 48px;gap:10px;align-items:center;font-variant-numeric:tabular-nums}
+@media (max-width:480px){.phase-row{grid-template-columns:110px 1fr 40px}}
+.bar{height:10px;background:var(--surface-2);border-radius:5px;overflow:hidden;display:flex}
+.bar>span{display:block;height:100%}
+.bar .d{background:var(--duty)}.bar .s{background:var(--study)}
+.cond-table{width:100%;border-collapse:collapse;font-size:.88rem}
+.cond-table th{text-align:left;font-weight:600;color:var(--ink-3);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;padding:6px 8px;border-bottom:1px solid var(--line)}
+.cond-table td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.cond-table td.c{text-align:center}
+.tick{font-weight:700}
+.tick.y{color:var(--good)}.tick.n{color:var(--ink-3)}
+.scroll-x{overflow-x:auto}
+.next li{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}
+.next li:last-child{border-bottom:0}
+ul.clean{list-style:none;margin:0;padding:0}
+
+/* Steps */
+.task{display:grid;grid-template-columns:24px 1fr;gap:10px;padding:12px 12px 12px 10px;border-left:4px solid var(--line);background:var(--surface);border-radius:0 var(--r) var(--r) 0}
+.task.duty{border-left-color:var(--duty)}.task.study{border-left-color:var(--study)}
+.task input{width:20px;height:20px;margin-top:2px;accent-color:var(--accent)}
+.task.done .t-title{text-decoration:line-through;color:var(--ink-3)}
+.t-title{font-weight:600}
+.t-body{font-size:.88rem;color:var(--ink-2);margin-top:2px}
+.t-meta{margin-top:6px}
+
+/* Conditions */
+.cond-card{border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.cond-card>summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.cond-card>summary::-webkit-details-marker{display:none}
+.cond-card[open]>summary{border-bottom:1px solid var(--line)}
+.cond-body{padding:14px;display:flex;flex-direction:column;gap:12px}
+.meter{display:inline-flex;gap:2px}
+.meter i{width:14px;height:6px;border-radius:2px;background:var(--surface-2)}
+.meter i.on{background:var(--good)}
+
+.doc-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.doc-pick{text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);cursor:pointer;color:var(--ink);font:inherit;display:flex;flex-direction:column;gap:2px}
+.doc-pick[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.doc-pick .form{font-family:var(--f-mono);font-size:.75rem;color:var(--accent)}
+.doc-pick .nm{font-weight:600}
+.doc-pick .st{font-size:.78rem;color:var(--ink-3)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:var(--r);font-weight:600;z-index:20}
+.confirm{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px;border:1px solid var(--bad);border-radius:var(--r);background:var(--bad-bg)}
+a{color:var(--study)}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;font-size:.9rem}
+.kv dt{color:var(--ink-3)}.kv dd{margin:0;font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:no-preference){.bar>span,.ring circle{transition:all .4s ease}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="eyebrow">VA disability claim · private workbook</div>
+      <h1>Claim Kit</h1>
+    </div>
+    <div class="legend small">
+      <span class="chip duty"><span class="dot duty"></span>Duty side</span>
+      <span class="chip study"><span class="dot study"></span>Off-duty / school side</span>
+    </div>
+  </header>
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+  <div id="exampleBanner"></div>
+  <main id="main"></main>
+</div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+(function(){
+'use strict';
+const KEY='claimkit.v1';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const DAY=86400000;
+
+/* ---------- Steps (VA process as of 2026) ---------- */
+const PHASES=[
+ {id:'ready',name:'Get ready'},
+ {id:'evidence',name:'Build evidence'},
+ {id:'file',name:'File the claim'},
+ {id:'exams',name:'Exams & decision'}
+];
+const TASKS=[
+ {id:'sepdate',p:'ready',side:'duty',t:'Confirm your separation date',b:'Enter it under About me. The app then works out your Benefits Delivery at Discharge (BDD) window: 180 to 90 days before you leave.'},
+ {id:'strs',p:'ready',side:'duty',t:'Get a full copy of your service treatment records',b:'Ask your clinic or medical records office for your complete STRs (including dental and behavioral health). If you file online VA requests them, but keep your own copy to find dates for each condition.'},
+ {id:'profiles',p:'ready',side:'duty',t:'Pull profiles, sick-call notes and line-of-duty reports',b:'Physical profiles, LOD determinations, injury or accident reports and deployment health assessments are strong in-service evidence.'},
+ {id:'tap',p:'ready',side:'duty',t:'Attend the TAP VA benefits briefing',b:'You can usually meet a VSO there, often on base.'},
+ {id:'sha',p:'ready',side:'duty',t:'Complete the Separation Health Assessment Part A',b:'Required with a BDD claim. List every symptom honestly, even minor ones; this form is often the only in-service record of a problem.'},
+ {id:'listconds',p:'ready',side:'study',t:'List every condition, head to toe',b:'Add each one under Conditions, even if it seems small (tinnitus, knees, back, sleep, migraines, mental health, skin, GI).'},
+ {id:'private',p:'ready',side:'study',t:'Collect civilian medical records',b:'Get copies yourself, or plan to sign VA Form 21-4142 and 21-4142a so VA can request them.'},
+ {id:'statements',p:'evidence',side:'study',t:'Write a personal statement for each condition',b:'Fill in the condition details and the app drafts a statement for VA Form 21-4138. Read it, make it sound like you, then copy it.'},
+ {id:'buddies',p:'evidence',side:'duty',t:'Ask 1 to 3 people for buddy statements',b:'Unit members, supervisors, a spouse or roommate who saw the injury or the symptoms. They use VA Form 21-10210. The app writes the ask and a starter draft.'},
+ {id:'nexus',p:'evidence',side:'study',t:'Ask a provider for a medical opinion where the link is unclear',b:'Needed most when the condition is not clearly in your STRs, or for secondary conditions. The app writes the request letter.'},
+ {id:'exposure',p:'evidence',side:'study',t:'Fill in your toxic exposure history',b:'The 21-526EZ asks about burn pits, Gulf War, Agent Orange and other exposures (PACT Act). Some conditions are presumptive.'},
+ {id:'mh',p:'evidence',side:'study',t:'If claiming a mental health condition, prepare the 21-0781 details',b:'Only needed for conditions tied to a traumatic event. The app builds a worksheet of the event details VA asks for.'},
+ {id:'vso',p:'evidence',side:'study',t:'Meet a VSO or accredited representative (free)',b:'DAV, VFW, American Legion, state veterans offices and others review claims for free. They can file VA Form 21-22 to represent you. Never pay to file an initial claim.'},
+ {id:'itf',p:'file',side:'study',t:'Lock in your effective date',b:'Filing BDD: no intent to file needed, an approved claim pays from the day after discharge. After discharge: starting the 21-526EZ online creates an intent to file automatically (or use VA Form 21-0966). You then have 1 year to finish.'},
+ {id:'526',p:'file',side:'study',t:'Start the 21-526EZ on VA.gov and paste your answers',b:'Use the "21-526EZ answers" document. VA.gov prefills your contact and service details from your record; check them.'},
+ {id:'upload',p:'file',side:'study',t:'Upload statements and records',b:'Upload personal statements, buddy statements, medical opinions and civilian records with the claim.'},
+ {id:'submit',p:'file',side:'study',t:'Submit inside the BDD window',b:'Between 180 and 90 days before separation. You can still add conditions until day 90.'},
+ {id:'avail',p:'exams',side:'duty',t:'Stay available for exams for 45 days',b:'BDD requires you to be available for VA exams for 45 days after you file. Plan leave and duty around it.'},
+ {id:'cpprep',p:'exams',side:'study',t:'Prepare for each C&P exam',b:'Use the C&P prep sheet: describe your worst days, flare-ups, and where pain starts during movement.'},
+ {id:'cpattend',p:'exams',side:'duty',t:'Attend every exam',b:'Missing an exam can get a condition denied. Reschedule ahead of time if you have a conflict.'},
+ {id:'decision',p:'exams',side:'study',t:'Review the decision letter',b:'If something is denied or rated low you have 1 year to file a Supplemental Claim (new evidence), Higher-Level Review, or Board Appeal.'}
+];
+
+/* ---------- Documents ---------- */
+const DOCS=[
+ {id:'526',form:'VA Form 21-526EZ',name:'Claim answers, section by section',for:'all'},
+ {id:'stmt',form:'VA Form 21-4138',name:'Personal statement',for:'cond'},
+ {id:'buddyask',form:'Message',name:'Buddy statement request',for:'wit'},
+ {id:'buddy',form:'VA Form 21-10210',name:'Buddy statement starter draft',for:'wit'},
+ {id:'nexus',form:'Letter',name:'Medical opinion request to a provider',for:'cond'},
+ {id:'0781',form:'VA Form 21-0781',name:'Traumatic event worksheet',for:'mh'},
+ {id:'cp',form:'Exam prep',name:'C&P exam prep sheet',for:'cond'},
+ {id:'records',form:'Checklist',name:'Records to request',for:'all'}
+];
+
+/* ---------- State ---------- */
+function blankState(){return{example:false,profile:{},conditions:[],witnesses:[],exposure:{},tasks:{},docEdits:{},docDone:{},claim:{},tab:'dash',docSel:{id:'526',ref:''}};}
+function exampleState(){
+  const today=new Date();const sep=new Date(today.getTime()+170*DAY);
+  const c1=uid(),c2=uid(),c3=uid();
+  return {example:true,tab:'dash',docSel:{id:'526',ref:''},
+   profile:{name:'Sample Soldier',branch:'Army',component:'Active duty',rank:'SSG',mos:'68W Combat Medic',entry:'2014-06-02',sep:sep.toISOString().slice(0,10),sepType:'ETS',email:'',phone:''},
+   conditions:[
+    {id:c1,name:'Lower back strain',kind:'physical',cause:'direct',secondaryTo:'',onset:'2017-03',event:'Hurt my lower back lifting a litter during a field training exercise at Fort Hood. Seen at sick call two days later.',symptoms:'Constant ache in the low back, sharp pain when bending or lifting, stiffness every morning.',frequency:'Daily, worse after ruck marches and long shifts.',worst:'I cannot bend to put on boots and need to lie flat for most of the day.',flare:'About twice a month, lasting 2 to 3 days.',work:'Placed on profile three times. I avoid lifting patients alone.',daily:'Trouble sleeping more than 4 hours, cannot sit through a 2-hour class without standing.',treatment:'Physical therapy 2019 and 2023, chiropractic.',meds:'Meloxicam, cyclobenzaprine as needed.',diagnosed:true,diagnosis:'Lumbosacral strain (STR 2017, 2023)',str:'Sick call 2017-03-14; profile 2019; PT notes 2023',nexus:'not needed',statementDone:false},
+    {id:c2,name:'Tinnitus',kind:'physical',cause:'direct',secondaryTo:'',onset:'2016',event:'Constant exposure to rotor noise and weapons ranges as a medic with an aviation unit.',symptoms:'High-pitched ringing in both ears.',frequency:'Constant.',worst:'Ringing keeps me awake and I miss parts of lectures.',flare:'Louder after ranges.',work:'',daily:'Use a fan to sleep.',treatment:'',meds:'',diagnosed:false,diagnosis:'',str:'Hearing conservation audiograms each year',nexus:'not needed'},
+    {id:c3,name:'Anxiety',kind:'mental',cause:'direct',secondaryTo:'',onset:'2018',event:'Treated mass casualty patients during a 2018 deployment.',symptoms:'Racing thoughts, irritability, trouble sleeping, avoiding crowds.',frequency:'Several times a week.',worst:'Panic symptoms and I leave class or work early.',flare:'',work:'Hard to focus during long shifts.',daily:'Avoid crowded places, sleep 4 to 5 hours.',treatment:'Behavioral health on post, 2020 to present.',meds:'Sertraline.',diagnosed:true,diagnosis:'Generalized anxiety disorder (BH 2020)',str:'Behavioral health notes 2020 to present',nexus:'maybe',ev:{date:'2018-08',place:'Kandahar Airfield, Afghanistan',unit:'Sample unit',what:'Treated several critically injured patients during a mass casualty event.',changes:'Started having trouble sleeping, asked for more night shifts, conflicts with coworkers.',reported:'Told my squad leader; first BH visit in 2020.'}}
+   ],
+   witnesses:[{id:uid(),name:'Sample Buddy',relation:'Former team leader',contact:'',conds:[c1],saw:'Saw me hurt my back during the 2017 field exercise and covered my lifts afterward.',status:'not asked'}],
+   exposure:{gulf:'yes',gulfWhere:'Afghanistan, 2018 (burn pits at Kandahar Airfield)',burnpit:'yes',agentOrange:'no',other:'',hazards:'Burn pit smoke, diesel exhaust, sand and dust'},
+   tasks:{sepdate:true,tap:true,listconds:true},docEdits:{},docDone:{},claim:{}};
+}
+let S;
+function load(){try{const raw=localStorage.getItem(KEY);if(raw){S=Object.assign(blankState(),JSON.parse(raw));return;}}catch(e){}S=exampleState();}
+let saveTimer;
+function save(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}},200);}
+function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(t._h);t._h=setTimeout(()=>t.hidden=true,1800);}
+
+/* ---------- Dates ---------- */
+function parseDate(s){if(!s)return null;const d=new Date(s+'T12:00:00');return isNaN(d)?null:d;}
+function fmt(d){return d?d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'';}
+function bdd(){
+  const sep=parseDate(S.profile.sep);const now=new Date();now.setHours(12,0,0,0);
+  if(!sep)return{state:'nodate'};
+  const open=new Date(sep-180*DAY),close=new Date(sep-90*DAY);
+  const daysToOpen=Math.ceil((open-now)/DAY),daysToClose=Math.ceil((close-now)/DAY),daysToSep=Math.ceil((sep-now)/DAY);
+  let state;
+  if(daysToSep<0)state=(now-sep)/DAY<=365?'after1y':'afterlong';
+  else if(daysToOpen>0)state='before';else if(daysToClose>=0)state='open';else state='closed';
+  return{state,sep,open,close,now,daysToOpen,daysToClose,daysToSep,anniversary:new Date(sep.getTime()+365*DAY)};
+}
+
+/* ---------- Condition readiness ---------- */
+const READY=[
+ ['Details',c=>!!(c.event&&c.symptoms&&c.frequency&&c.daily)],
+ ['In-service record',c=>!!c.str],
+ ['Diagnosis',c=>!!c.diagnosed],
+ ['Link to service',c=>c.cause==='presumptive'||c.nexus==='not needed'||c.nexus==='have'],
+ ['Buddy statement',c=>S.witnesses.some(w=>(w.conds||[]).includes(c.id)&&w.status==='received')||c.noBuddy]
+];
+function condScore(c){return READY.filter(([,f])=>f(c)).length;}
+function progress(){
+  const tasksDone=TASKS.filter(t=>S.tasks[t.id]).length;
+  const condPts=S.conditions.reduce((a,c)=>a+condScore(c),0),condMax=S.conditions.length*READY.length;
+  const pct=Math.round(100*(tasksDone+condPts)/(TASKS.length+condMax||1));
+  return{pct,tasksDone,condPts,condMax};
+}
+
+/* ---------- Tabs ---------- */
+const TABS=[['dash','Dashboard'],['steps','Steps'],['me','About me'],['conds','Conditions'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['backup','Backup & help']];
+function renderTabs(){
+  $('#tabs').innerHTML=TABS.map(([id,n])=>`<button role="tab" id="tab-${id}" aria-selected="${S.tab===id}" data-tab="${id}">${n}</button>`).join('');
+}
+function go(tab){S.tab=tab;save();render();window.scrollTo({top:0});}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b){go(b.dataset.tab);}});
+
+function renderBanner(){
+  $('#exampleBanner').innerHTML=S.example?`<div class="banner" style="margin-top:16px"><span><b>You are looking at an example claim.</b> Look around, then start your own. Your data stays in this browser only.</span><span class="row"><button class="btn primary sm" id="startOwn">Start my own claim</button></span></div>`:'';
+  const b=$('#startOwn');if(b)b.onclick=()=>{S=blankState();S.tab='me';save();render();toast('Blank claim started');};
+}
+
+/* ---------- Views ---------- */
+function vDash(){
+  const p=progress(),B=bdd();
+  const r=54,C=2*Math.PI*r,off=C*(1-p.pct/100);
+  const ring=`<svg class="ring" viewBox="0 0 132 132" role="img" aria-label="${p.pct} percent ready"><circle cx="66" cy="66" r="${r}" fill="none" stroke="var(--surface-2)" stroke-width="12"/><circle cx="66" cy="66" r="${r}" fill="none" stroke="var(--accent)" stroke-width="12" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${off}" transform="rotate(-90 66 66)"/><text x="66" y="72" text-anchor="middle" font-size="34">${p.pct}%</text><text x="66" y="92" text-anchor="middle" font-size="12" style="fill:var(--ink-3);font-family:var(--f-body);font-weight:500">ready</text></svg>`;
+  let headline,chip;
+  switch(B.state){
+   case 'nodate':headline='Add your separation date to see your filing window.';chip='<span class="chip plain">No date yet</span>';break;
+   case 'before':headline=`Your BDD window opens in ${B.daysToOpen} days, on ${fmt(B.open)}.`;chip='<span class="chip warn">Getting ready</span>';break;
+   case 'open':headline=`Your BDD window is open. File by ${fmt(B.close)} (${B.daysToClose} days left).`;chip='<span class="chip good">Window open</span>';break;
+   case 'closed':headline=`The BDD window closed on ${fmt(B.close)}. File a standard claim; filing within 1 year of discharge still pays from the day after discharge.`;chip='<span class="chip bad">BDD closed</span>';break;
+   case 'after1y':headline=`File by ${fmt(B.anniversary)} to get paid back to the day after discharge. Starting the claim online creates an intent to file.`;chip='<span class="chip warn">Discharged</span>';break;
+   default:headline='Start your claim online to create an intent to file, which saves your effective date for 1 year.';chip='<span class="chip plain">Standard claim</span>';
+  }
+  // timeline
+  let tl='';
+  if(B.sep&&['before','open','closed'].includes(B.state)){
+    const start=new Date(Math.min(B.now,B.open)-14*DAY),end=new Date(B.sep.getTime()+21*DAY);
+    const x=d=>Math.max(0,Math.min(100,100*(d-start)/(end-start)));
+    const L=(d,cls,html)=>{const v=x(d);const tr=v<15?'translateX(0)':v>85?'translateX(-100%)':'translateX(-50%)';return `<div class="tl-lab ${cls}" style="left:${v}%;transform:${tr}">${html}</div>`;};
+    tl=`<div class="timeline" aria-label="Filing timeline"><div class="tl-bar">
+      <div class="tl-win" style="left:${x(B.open)}%;width:${x(B.close)-x(B.open)}%"></div>
+      <div class="tl-mark today" style="left:${x(B.now)}%"></div>${L(B.now,'up','<b>Today</b>')}
+      <div class="tl-mark" style="left:${x(B.open)}%"></div>${L(B.open,'down','Opens '+fmt(B.open))}
+      <div class="tl-mark" style="left:${x(B.close)}%"></div>${L(B.close,'up','Last day '+fmt(B.close))}
+      <div class="tl-mark" style="left:${x(B.sep)}%"></div>${L(B.sep,'down','Separation '+fmt(B.sep))}
+    </div></div><p class="small muted">Green band: the BDD window, 180 to 90 days before separation. After filing you must be available for VA exams for 45 days.</p>`;
+  }
+  const phases=PHASES.map(ph=>{
+    const ts=TASKS.filter(t=>t.p===ph.id),n=ts.length;
+    const d=ts.filter(t=>S.tasks[t.id]&&t.side==='duty').length,s=ts.filter(t=>S.tasks[t.id]&&t.side==='study').length;
+    return `<div class="phase-row"><span>${ph.name}</span><div class="bar" role="img" aria-label="${d+s} of ${n} done"><span class="d" style="width:${100*d/n}%"></span><span class="s" style="width:${100*s/n}%"></span></div><span class="small muted" style="text-align:right">${d+s}/${n}</span></div>`;
+  }).join('');
+  const next=TASKS.filter(t=>!S.tasks[t.id]).slice(0,4);
+  const nextHtml=next.length?`<ul class="clean next">${next.map(t=>`<li><span class="dot ${t.side}" style="margin-top:8px;flex:none"></span><div style="flex:1;min-width:0"><div class="t-title">${esc(t.t)}</div><div class="small muted">${esc(t.b)}</div></div><button class="btn sm" data-done="${t.id}">Done</button></li>`).join('')}</ul>`:'<p class="muted">Every step is checked off. Watch for your decision letter.</p>';
+  const condRows=S.conditions.length?`<div class="scroll-x"><table class="cond-table"><thead><tr><th>Condition</th>${READY.map(r=>`<th class="c" style="text-align:center">${r[0]}</th>`).join('')}<th>Ready</th></tr></thead><tbody>${S.conditions.map(c=>{const sc=condScore(c);return `<tr><td><button class="link" data-open-cond="${c.id}">${esc(c.name||'Untitled')}</button></td>${READY.map(([,f])=>f(c)?'<td class="c"><span class="tick y" aria-label="yes">✓</span></td>':'<td class="c"><span class="tick n" aria-label="not yet">–</span></td>').join('')}<td><span class="chip ${sc===READY.length?'good':sc>=3?'warn':'plain'}">${sc}/${READY.length}</span></td></tr>`;}).join('')}</tbody></table></div>`:`<p class="muted">No conditions yet. <button class="link" data-tab="conds">Add your first condition</button>.</p>`;
+  const docsDone=Object.values(S.docDone).filter(Boolean).length;
+  return `<div class="stack">
+   <div class="panel"><div class="dash-head">${ring}<div class="stack" style="gap:8px">${chip}<h2>${esc(headline)}</h2>
+   <dl class="kv"><dt>Steps done</dt><dd>${p.tasksDone} of ${TASKS.length}</dd><dt>Evidence points</dt><dd>${p.condPts} of ${p.condMax}</dd><dt>Documents marked final</dt><dd>${docsDone}</dd>${S.claim.filed?`<dt>Filed</dt><dd>${fmt(parseDate(S.claim.filed))}</dd>`:''}</dl></div></div>${tl}</div>
+   <div class="grid2">
+    <div class="panel stack"><h3>Up next</h3>${nextHtml}</div>
+    <div class="panel stack"><h3>Progress by phase</h3>${phases}<div class="row small muted"><span class="dot duty"></span>Duty-side steps <span class="dot study" style="margin-left:8px"></span>Off-duty steps</div></div>
+   </div>
+   <div class="panel stack"><h3>Evidence for each condition</h3><p class="small muted">VA grants a condition when it has three things: a current diagnosis, an in-service event or record, and a link between them. A buddy statement fills gaps.</p>${condRows}</div>
+   <div class="panel stack"><h3>Claim tracking</h3><div class="grid2">
+     <label class="f">Date filed<input type="date" id="cl-filed" value="${esc(S.claim.filed||'')}"></label>
+     <label class="f">Claim number or confirmation<input type="text" id="cl-num" value="${esc(S.claim.num||'')}"></label>
+     <label class="f">C&amp;P exam dates and places<textarea id="cl-exams">${esc(S.claim.exams||'')}</textarea></label>
+     <label class="f">Decision notes<textarea id="cl-dec">${esc(S.claim.dec||'')}</textarea></label></div></div>
+  </div>`;
+}
+function bindDash(){
+  document.querySelectorAll('[data-done]').forEach(b=>b.onclick=()=>{S.tasks[b.dataset.done]=true;save();render();});
+  document.querySelectorAll('[data-open-cond]').forEach(b=>b.onclick=()=>{S.openCond=b.dataset.openCond;go('conds');});
+  [['cl-filed','filed'],['cl-num','num'],['cl-exams','exams'],['cl-dec','dec']].forEach(([id,k])=>{$('#'+id).oninput=e=>{S.claim[k]=e.target.value;save();};});
+}
+
+function vSteps(){
+  return `<div class="stack"><p class="muted">Green steps happen through your unit, clinic or base. Blue steps are writing and uploading you can fit around nursing school.</p>`+PHASES.map(ph=>`<div class="stack" style="gap:8px"><h2>${ph.name}</h2>${TASKS.filter(t=>t.p===ph.id).map(t=>`<label class="task ${t.side} ${S.tasks[t.id]?'done':''}"><input type="checkbox" id="task-${t.id}" data-task="${t.id}" ${S.tasks[t.id]?'checked':''}><div><div class="t-title">${esc(t.t)}</div><div class="t-body">${esc(t.b)}</div><div class="t-meta"><span class="chip ${t.side}">${t.side==='duty'?'Duty side':'Off-duty'}</span></div></div></label>`).join('')}</div>`).join('')+`</div>`;
+}
+function bindSteps(){document.querySelectorAll('[data-task]').forEach(c=>c.onchange=()=>{S.tasks[c.dataset.task]=c.checked;c.closest('.task').classList.toggle('done',c.checked);save();});}
+
+function field(id,label,val,opts={}){
+  const hint=opts.hint?`<span class="hint">${esc(opts.hint)}</span>`:'';
+  if(opts.type==='textarea')return `<label class="f">${label}${hint}<textarea id="${id}" data-k="${opts.k||''}">${esc(val)}</textarea></label>`;
+  if(opts.type==='select')return `<label class="f">${label}${hint}<select id="${id}" data-k="${opts.k||''}">${opts.options.map(([v,n])=>`<option value="${esc(v)}" ${v===val?'selected':''}>${esc(n)}</option>`).join('')}</select></label>`;
+  return `<label class="f">${label}${hint}<input type="${opts.type||'text'}" id="${id}" data-k="${opts.k||''}" value="${esc(val)}"></label>`;
+}
+function vMe(){
+  const P=S.profile;
+  return `<div class="stack"><div class="panel stack"><h2>About me</h2><p class="small muted">VA.gov fills your contact details and service history from your record, so this is only what the documents need. Do not enter your SSN here.</p>
+  <div class="grid2">
+   ${field('p-name','Full name',P.name,{k:'name'})}
+   ${field('p-branch','Branch',P.branch,{k:'branch',type:'select',options:[['',''],['Army','Army'],['Navy','Navy'],['Air Force','Air Force'],['Marine Corps','Marine Corps'],['Coast Guard','Coast Guard'],['Space Force','Space Force']]})}
+   ${field('p-comp','Component',P.component,{k:'component',type:'select',options:[['',''],['Active duty','Active duty'],['Reserve','Reserve'],['National Guard','National Guard']]})}
+   ${field('p-rank','Rank',P.rank,{k:'rank'})}
+   ${field('p-mos','Job (MOS / rating / AFSC)',P.mos,{k:'mos'})}
+   ${field('p-entry','Service start date',P.entry,{k:'entry',type:'date'})}
+   ${field('p-sep','Separation date',P.sep,{k:'sep',type:'date',hint:'Expected date if still serving'})}
+   ${field('p-septype','Type of separation',P.sepType,{k:'sepType',type:'select',options:[['',''],['ETS','ETS / end of contract'],['Retirement','Retirement'],['Medical','Medical (IDES)'],['Other','Other']]})}
+   ${field('p-phone','Phone (for buddy and provider letters)',P.phone,{k:'phone',type:'tel'})}
+   ${field('p-email','Email (for letters)',P.email,{k:'email',type:'email'})}
+  </div>${P.sepType==='Medical'?'<p class="banner small">In IDES (medical separation) VA rates you through the military process, and BDD does not apply. Ask your PEBLO and MSC about adding conditions.</p>':''}</div></div>`;
+}
+function bindMe(){document.querySelectorAll('[data-k]').forEach(el=>el.addEventListener(el.tagName==='SELECT'?'change':'input',()=>{S.profile[el.dataset.k]=el.value;save();if(el.dataset.k==='sepType')render();}));}
+
+function vConds(){
+  const opts={cause:[['direct','Started or happened during service'],['secondary','Caused or worsened by another service-connected condition'],['aggravated','Existed before service and service made it worse'],['presumptive','Presumptive (for example PACT Act or Gulf War)']],
+    nexus:[['not needed','Not needed: it is clearly in my STRs'],['maybe','Not sure yet'],['need','Need a medical opinion'],['asked','Asked a provider'],['have','Have a medical opinion']]};
+  const cards=S.conditions.map(c=>{
+    const sc=condScore(c);
+    return `<details class="cond-card" ${S.openCond===c.id?'open':''} data-cid="${c.id}"><summary><span class="row"><b>${esc(c.name||'Untitled condition')}</b><span class="chip ${c.kind==='mental'?'study':'plain'}">${c.kind==='mental'?'Mental health':'Physical'}</span></span><span class="row small muted"><span class="meter" aria-label="${sc} of ${READY.length}">${READY.map((_,i)=>`<i class="${i<sc?'on':''}"></i>`).join('')}</span>${sc}/${READY.length}</span></summary>
+    <div class="cond-body">
+     <div class="grid2">
+      ${field('c-name-'+c.id,'Condition name',c.name,{k:'name',hint:'Use the plain name, like "lower back pain" or "tinnitus"'})}
+      ${field('c-kind-'+c.id,'Type',c.kind,{k:'kind',type:'select',options:[['physical','Physical'],['mental','Mental health']]})}
+      ${field('c-cause-'+c.id,'How is it connected to service?',c.cause,{k:'cause',type:'select',options:opts.cause})}
+      ${c.cause==='secondary'?field('c-sec-'+c.id,'Caused by which condition?',c.secondaryTo,{k:'secondaryTo'}):''}
+      ${field('c-onset-'+c.id,'When did it start?',c.onset,{k:'onset',hint:'Month and year is fine'})}
+     </div>
+     ${field('c-event-'+c.id,'What happened in service?',c.event,{k:'event',type:'textarea',hint:'The injury, event, duty or exposure, with where and when'})}
+     <div class="grid2">
+      ${field('c-sym-'+c.id,'Symptoms now',c.symptoms,{k:'symptoms',type:'textarea'})}
+      ${field('c-freq-'+c.id,'How often',c.frequency,{k:'frequency',type:'textarea'})}
+      ${field('c-worst-'+c.id,'On your worst days',c.worst,{k:'worst',type:'textarea',hint:'VA rates on how bad it gets, so be specific'})}
+      ${field('c-flare-'+c.id,'Flare-ups',c.flare,{k:'flare',type:'textarea',hint:'How often and how long'})}
+      ${field('c-work-'+c.id,'Effect on work or duty',c.work,{k:'work',type:'textarea'})}
+      ${field('c-daily-'+c.id,'Effect on daily life and school',c.daily,{k:'daily',type:'textarea'})}
+      ${field('c-tx-'+c.id,'Treatment so far',c.treatment,{k:'treatment',type:'textarea'})}
+      ${field('c-meds-'+c.id,'Medications',c.meds,{k:'meds',type:'textarea'})}
+     </div>
+     <h3>Evidence</h3>
+     <div class="grid2">
+      ${field('c-str-'+c.id,'Where it shows in your records',c.str,{k:'str',type:'textarea',hint:'Sick call dates, profiles, LOD, audiograms'})}
+      <div class="stack" style="gap:8px">
+       <label class="row small"><input type="checkbox" id="c-dx-${c.id}" data-k="diagnosed" ${c.diagnosed?'checked':''}> I have a current diagnosis</label>
+       ${field('c-dxn-'+c.id,'Diagnosis and where it is written',c.diagnosis,{k:'diagnosis'})}
+       ${field('c-nexus-'+c.id,'Medical opinion linking it to service',c.nexus||'maybe',{k:'nexus',type:'select',options:opts.nexus})}
+       <label class="row small"><input type="checkbox" id="c-nobuddy-${c.id}" data-k="noBuddy" ${c.noBuddy?'checked':''}> No buddy statement needed for this one</label>
+      </div>
+     </div>
+     ${c.kind==='mental'?`<h3>Traumatic event details (for VA Form 21-0781)</h3><p class="small muted">Only if the condition is tied to an event. Leave blank for conditions that built up over time.</p><div class="grid2">
+      ${field('c-evd-'+c.id,'Approximate date',(c.ev||{}).date,{k:'ev.date'})}
+      ${field('c-evp-'+c.id,'Location',(c.ev||{}).place,{k:'ev.place'})}
+      ${field('c-evu-'+c.id,'Unit at the time',(c.ev||{}).unit,{k:'ev.unit'})}
+      ${field('c-evw-'+c.id,'What happened',(c.ev||{}).what,{k:'ev.what',type:'textarea'})}
+      ${field('c-evc-'+c.id,'Changes others may have noticed afterward',(c.ev||{}).changes,{k:'ev.changes',type:'textarea',hint:'Requests for transfer, conduct changes, sick visits, relationship or sleep changes'})}
+      ${field('c-evr-'+c.id,'Who you told, and when',(c.ev||{}).reported,{k:'ev.reported',type:'textarea'})}
+     </div>`:''}
+     <div class="row"><button class="btn sm" data-doc-for="stmt:${c.id}">Open personal statement</button><button class="btn sm" data-doc-for="cp:${c.id}">Open C&amp;P prep</button><span style="flex:1"></span><span data-delwrap="${c.id}"><button class="btn sm danger" data-del="${c.id}">Remove</button></span></div>
+    </div></details>`;}).join('');
+  return `<div class="stack"><div class="row" style="justify-content:space-between"><h2>Conditions</h2><button class="btn primary" id="addCond">Add a condition</button></div>
+   ${S.conditions.length?cards:'<div class="panel muted">Add each condition you want to claim. Go head to toe: hearing, head, neck, back, joints, sleep, mood, skin, stomach, breathing.</div>'}</div>`;
+}
+function setPath(o,k,v){const ks=k.split('.');let t=o;while(ks.length>1){const p=ks.shift();t[p]=t[p]||{};t=t[p];}t[ks[0]]=v;}
+function bindConds(){
+  $('#addCond').onclick=()=>{const c={id:uid(),name:'',kind:'physical',cause:'direct',nexus:'maybe'};S.conditions.push(c);S.openCond=c.id;save();render();const el=$('#c-name-'+c.id);el&&el.focus();};
+  document.querySelectorAll('.cond-card').forEach(card=>{
+    const c=S.conditions.find(x=>x.id===card.dataset.cid);
+    card.addEventListener('toggle',()=>{if(card.open)S.openCond=c.id;});
+    card.querySelectorAll('[data-k]').forEach(el=>{
+      const ev=el.type==='checkbox'||el.tagName==='SELECT'?'change':'input';
+      el.addEventListener(ev,()=>{setPath(c,el.dataset.k,el.type==='checkbox'?el.checked:el.value);save();if(['kind','cause','diagnosed','nexus','noBuddy'].includes(el.dataset.k))render();else if(el.dataset.k==='name')card.querySelector('summary b').textContent=el.value||'Untitled condition';});
+    });
+  });
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const id=b.dataset.del,w=document.querySelector(`[data-delwrap="${id}"]`);w.innerHTML=`<span class="confirm small">Remove this condition? <button class="btn sm danger" data-del-yes="${id}">Remove</button><button class="btn sm" data-del-no>Keep</button></span>`;
+    w.querySelector('[data-del-yes]').onclick=()=>{S.conditions=S.conditions.filter(c=>c.id!==id);save();render();toast('Condition removed');};w.querySelector('[data-del-no]').onclick=()=>render();});
+  document.querySelectorAll('[data-doc-for]').forEach(b=>b.onclick=()=>{const [id,ref]=b.dataset.docFor.split(':');S.docSel={id,ref};go('docs');});
+}
+
+function vWits(){
+  const rows=S.witnesses.map(w=>`<div class="panel stack" data-wid="${w.id}">
+    <div class="grid2">${field('w-name-'+w.id,'Name',w.name,{k:'name'})}${field('w-rel-'+w.id,'How they know you',w.relation,{k:'relation',hint:'Squad leader, roommate, spouse'})}
+    ${field('w-contact-'+w.id,'Contact',w.contact,{k:'contact'})}${field('w-status-'+w.id,'Status',w.status,{k:'status',type:'select',options:[['not asked','Not asked yet'],['asked','Asked'],['received','Statement received']]})}</div>
+    ${field('w-saw-'+w.id,'What they saw',w.saw,{k:'saw',type:'textarea',hint:'The event, or symptoms and changes they noticed'})}
+    <div class="stack" style="gap:4px"><span class="small muted" style="font-weight:600">Conditions they can speak to</span><div class="row">${S.conditions.map(c=>`<label class="row small"><input type="checkbox" id="w-c-${w.id}-${c.id}" data-wc="${c.id}" ${(w.conds||[]).includes(c.id)?'checked':''}> ${esc(c.name||'Untitled')}</label>`).join('')||'<span class="small muted">Add conditions first.</span>'}</div></div>
+    <div class="row"><button class="btn sm" data-doc-for="buddyask:${w.id}">Open request message</button><button class="btn sm" data-doc-for="buddy:${w.id}">Open starter draft</button><span style="flex:1"></span><span data-wdelwrap="${w.id}"><button class="btn sm danger" data-wdel="${w.id}">Remove</button></span></div>
+  </div>`).join('');
+  return `<div class="stack"><div class="row" style="justify-content:space-between"><h2>Witnesses</h2><button class="btn primary" id="addWit">Add a person</button></div><p class="muted">Buddy statements (VA Form 21-10210) back up what is missing from your records. The writer fills in the form themselves; you give them a starting point.</p>${rows||'<div class="panel muted">No one added yet.</div>'}</div>`;
+}
+function bindWits(){
+  $('#addWit').onclick=()=>{S.witnesses.push({id:uid(),name:'',relation:'',contact:'',saw:'',conds:[],status:'not asked'});save();render();};
+  document.querySelectorAll('[data-wid]').forEach(p=>{const w=S.witnesses.find(x=>x.id===p.dataset.wid);
+    p.querySelectorAll('[data-k]').forEach(el=>el.addEventListener(el.tagName==='SELECT'?'change':'input',()=>{w[el.dataset.k]=el.value;save();}));
+    p.querySelectorAll('[data-wc]').forEach(el=>el.onchange=()=>{w.conds=w.conds||[];if(el.checked)w.conds.push(el.dataset.wc);else w.conds=w.conds.filter(x=>x!==el.dataset.wc);save();});});
+  document.querySelectorAll('[data-wdel]').forEach(b=>b.onclick=()=>{const id=b.dataset.wdel,wr=document.querySelector(`[data-wdelwrap="${id}"]`);wr.innerHTML=`<span class="confirm small">Remove? <button class="btn sm danger" data-y>Remove</button><button class="btn sm" data-n>Keep</button></span>`;wr.querySelector('[data-y]').onclick=()=>{S.witnesses=S.witnesses.filter(w=>w.id!==id);save();render();};wr.querySelector('[data-n]').onclick=()=>render();});
+  document.querySelectorAll('[data-doc-for]').forEach(b=>b.onclick=()=>{const [id,ref]=b.dataset.docFor.split(':');S.docSel={id,ref};go('docs');});
+}
+
+function vExpo(){
+  const E=S.exposure,yn=[['',''],['yes','Yes'],['no','No'],['unsure','Not sure']];
+  return `<div class="stack"><div class="panel stack"><h2>Toxic exposure</h2><p class="small muted">The 21-526EZ asks these questions. Under the PACT Act some conditions are presumed to be caused by service if you served in certain places, so you do not need a medical opinion for them.</p>
+  <div class="grid2">
+   ${field('x-gulf','Served in the Gulf War area or Southwest Asia, Afghanistan, and nearby on or after Aug 2, 1990?',E.gulf,{k:'gulf',type:'select',options:yn})}
+   ${field('x-gulfwhere','Where and when',E.gulfWhere,{k:'gulfWhere',type:'textarea'})}
+   ${field('x-burn','Exposed to burn pits or other airborne hazards?',E.burnpit,{k:'burnpit',type:'select',options:yn})}
+   ${field('x-haz','What hazards',E.hazards,{k:'hazards',type:'textarea',hint:'Burn pit smoke, sand and dust, oil well fires, fuels, chemicals'})}
+   ${field('x-ao','Served in Vietnam-era Agent Orange locations?',E.agentOrange,{k:'agentOrange',type:'select',options:yn})}
+   ${field('x-other','Other exposures (radiation, Camp Lejeune water, asbestos, noise, chemicals)',E.other,{k:'other',type:'textarea'})}
+  </div></div></div>`;
+}
+function bindExpo(){document.querySelectorAll('[data-k]').forEach(el=>el.addEventListener(el.tagName==='SELECT'?'change':'input',()=>{S.exposure[el.dataset.k]=el.value;save();}));}
+
+/* ---------- Document generators ---------- */
+const P=()=>S.profile;
+const or=(v,ph)=>v&&String(v).trim()?String(v).trim():`[${ph}]`;
+const sentence=s=>{s=String(s||'').trim();if(!s)return '';return /[.!?]$/.test(s)?s:s+'.';};
+function causeLine(c){
+  switch(c.cause){
+   case 'secondary':return `This condition is secondary to my ${or(c.secondaryTo,'other service-connected condition')}.`;
+   case 'aggravated':return 'This condition existed before my service and was made worse by my service.';
+   case 'presumptive':return 'I believe this condition is presumptive based on where I served.';
+   default:return 'This condition started during my military service.';
+  }
+}
+function serviceIntro(){const p=P();return `My name is ${or(p.name,'full name')}. I served in the ${or(p.branch,'branch')} (${or(p.component,'component')}) as a ${or(p.rank,'rank')}, ${or(p.mos,'job')}, from ${or(fmt(parseDate(p.entry)),'start date')}${p.sep?` to ${fmt(parseDate(p.sep))}`:''}.`;}
+const certify='I certify that the statements above are true and correct to the best of my knowledge and belief.';
+function genStmt(c){
+  const lines=[`STATEMENT IN SUPPORT OF CLAIM (VA Form 21-4138)`,`Condition: ${or(c.name,'condition')}`,'',
+   `${serviceIntro()} I am submitting this statement in support of my claim for ${or(c.name,'condition')}.`,'',
+   `How it started`,`${causeLine(c)} ${sentence(c.event)}${c.onset?` This was around ${c.onset}.`:''}`.trim(),'',
+   `My symptoms`,`${sentence(or(c.symptoms,'symptoms'))} ${c.frequency?'This happens '+sentence(c.frequency.charAt(0).toLowerCase()+c.frequency.slice(1)):''}`.trim()];
+  if(c.worst)lines.push('',`On my worst days`,sentence(c.worst));
+  if(c.flare)lines.push('',`Flare-ups`,sentence(c.flare));
+  if(c.work||c.daily){lines.push('',`How it affects my life`);if(c.work)lines.push(`At work: ${sentence(c.work)}`);if(c.daily)lines.push(`Daily life: ${sentence(c.daily)}`);}
+  if(c.treatment||c.meds){lines.push('',`Treatment`);if(c.treatment)lines.push(sentence(c.treatment));if(c.meds)lines.push(`Medications: ${sentence(c.meds)}`);}
+  if(c.str)lines.push('',`Records`,`This is documented in my records: ${sentence(c.str)}`);
+  lines.push('',certify,'',`${or(P().name,'name')}`,`Date: ____________`);
+  return lines.join('\n');
+}
+function genCP(c){
+  return [`C&P EXAM PREP: ${or(c.name,'condition').toUpperCase()}`,'',
+  'Bring: ID, a list of medications, this sheet. Arrive early.','',
+  'Key points to say in your own words',
+  `- When it started: ${or(c.onset,'when')}. ${sentence(c.event)}`,
+  `- What it feels like now: ${sentence(or(c.symptoms,'symptoms'))}`,
+  `- How often: ${sentence(or(c.frequency,'frequency'))}`,
+  `- Worst days: ${sentence(or(c.worst,'describe your worst days'))}`,
+  `- Flare-ups: ${sentence(or(c.flare,'how often, how long, what you can not do during one'))}`,
+  `- Work and duty: ${sentence(or(c.work,'effect on work'))}`,
+  `- Daily life and school: ${sentence(or(c.daily,'effect on daily life'))}`,
+  `- Treatment and meds: ${sentence(or([c.treatment,c.meds].filter(Boolean).join('; '),'treatment'))}`,'',
+  'Reminders',
+  '- Describe a bad day, not a good day. The exam is a snapshot.',
+  '- For joints and back: say out loud when pain starts during each movement, and stop there. Mention if repeated use or flare-ups reduce your motion.',
+  '- Do not push through pain to look tough, and do not exaggerate.',
+  '- Mention every symptom, even ones that seem unrelated.',
+  c.kind==='mental'?'- Mental health: describe frequency of symptoms, sleep, relationships, work and school impact, and any panic, memory or concentration problems.':'- Bring any brace, cane or device you actually use.',
+  '- Afterward, write down how long the exam lasted and what was examined.'].join('\n');
+}
+function genNexus(c){const p=P();
+  return [`Dear Dr. ____________,`,'',
+  `I am filing a VA disability claim for ${or(c.name,'condition')} and am asking whether you would be willing to write a medical opinion about it. You have treated me for this condition${c.diagnosis?` (${c.diagnosis})`:''}.`,'',
+  `Background: ${causeLine(c)} ${sentence(c.event)}${c.str?` It is recorded in my service treatment records: ${sentence(c.str)}`:''}`,'',
+  'If, after reviewing my records, you agree, VA looks for:',
+  `1. The current diagnosis.`,
+  `2. Your opinion of whether it is "at least as likely as not" (50 percent or greater probability) that my ${or(c.name,'condition')} ${c.cause==='secondary'?`was caused or aggravated by my ${or(c.secondaryTo,'service-connected condition')}`:c.cause==='aggravated'?'was aggravated beyond its natural progression by my military service':'was incurred in or caused by my military service'}.`,
+  '3. The reasons for your opinion (the medical rationale), and the records you reviewed.',
+  '4. Your signature, credentials and date, on letterhead.','',
+  'I can provide copies of my service treatment records. I am only asking for your honest medical opinion. VA also has Disability Benefits Questionnaires (DBQs) you can fill in if you prefer.','',
+  'Thank you for your time.','',or(p.name,'name'),p.phone||'',p.email||''].filter((l,i,a)=>!(l===''&&a[i-1]==='')).join('\n');
+}
+function witConds(w){return S.conditions.filter(c=>(w.conds||[]).includes(c.id));}
+function genBuddyAsk(w){const p=P(),cs=witConds(w).map(c=>c.name).join(' and ')||'[condition]';
+  return [`Hi ${or(w.name,'name').split(' ')[0]},`,'',
+  `I'm filing my VA disability claim and would be grateful for a short statement from you about my ${cs}. You were there: ${sentence(or(w.saw,'what they saw'))}`,'',
+  'It goes on VA Form 21-10210 (Lay/Witness Statement), which you can fill out online at va.gov/supporting-forms-for-claims/lay-witness-statement-form-21-10210 or on paper. Just describe what you personally saw or know, in your own words, with dates and places if you remember them. It does not need to be long.','',
+  'I put a starter draft below that you can change however you like. Please only include what is true for you.','',
+  'Thanks,',or(p.name,'name')].join('\n');
+}
+function genBuddy(w){const p=P();const cs=witConds(w);
+  return [`LAY/WITNESS STATEMENT (VA Form 21-10210), starter draft for ${or(w.name,'witness')}`,'',
+  `My name is ${or(w.name,'name')}. I know ${or(p.name,'veteran')} as their ${or(w.relation,'relationship').toLowerCase()}.`,'',
+  ...cs.map(c=>`About their ${c.name}: ${sentence(or(w.saw,'what I saw'))}${c.onset?` This was around ${c.onset}.`:''} [Add what you noticed afterward: changes in how they worked, moved, slept, or acted.]`),
+  cs.length?'':'[Describe what you saw, with dates and places.]','',
+  'I certify that the statements above are true and correct to the best of my knowledge and belief.','',
+  '[Signature and date]'].join('\n');
+}
+function gen0781(c){const e=c.ev||{};
+  return [`VA FORM 21-0781 WORKSHEET: ${or(c.name,'condition')}`,
+  'Use these details when you complete the 21-0781 section on VA.gov or the PDF.','',
+  `Traumatic event`,`- Approximate date: ${or(e.date,'month and year')}`,`- Location: ${or(e.place,'location')}`,`- Unit: ${or(e.unit,'unit')}`,`- What happened: ${sentence(or(e.what,'describe the event'))}`,'',
+  `Behavioral changes after the event (VA can use these as evidence)`,`- ${sentence(or(e.changes,'list changes'))}`,'',
+  `Who knew`,`- ${sentence(or(e.reported,'who you told and when'))}`,'',
+  `Treatment`,`- ${sentence(or(c.treatment,'treatment'))}${c.meds?' Medications: '+sentence(c.meds):''}`,'',
+  'Notes',
+  '- For events involving military sexual trauma, evidence like requests for transfer, changes in performance, or visits to a chaplain or clinic count, even without a report.',
+  '- You can skip anything you are not comfortable writing. A VSO or the VA MST coordinator can help.',
+  '- Veterans Crisis Line: dial 988 then press 1, or text 838255.'].join('\n');
+}
+function gen526(){
+  const p=P(),E=S.exposure,lines=['VA FORM 21-526EZ ANSWERS (paste into VA.gov)',`Prepared ${fmt(new Date())}`,''];
+  lines.push('STEP: Veteran details','- VA.gov prefills your name, contact details and service periods. Check them against:',`  Branch: ${or(p.branch,'branch')} (${or(p.component,'component')})`,`  Service: ${or(fmt(parseDate(p.entry)),'start')} to ${or(fmt(parseDate(p.sep)),'separation date')}`,'');
+  lines.push('STEP: Conditions');
+  if(!S.conditions.length)lines.push('- [Add conditions in the app]');
+  S.conditions.forEach((c,i)=>{
+    lines.push(`${i+1}. ${or(c.name,'condition')}`);
+    const t={direct:'A new condition I got during service (or caused by service)',secondary:'Caused by another service-connected condition',aggravated:'Existed before service and got worse',presumptive:'A new condition I got during service (VA may treat it as presumptive)'}[c.cause||'direct'];
+    lines.push(`   What caused it: ${t}`);
+    if(c.cause==='secondary')lines.push(`   Caused by: ${or(c.secondaryTo,'condition')}`);
+    lines.push(`   Describe the injury, event or exposure: ${sentence(or(c.event,'what happened'))}`);
+    lines.push(`   When: ${or(c.onset,'approximate date')}`);
+    lines.push('');
+  });
+  lines.push('STEP: Mental health statement');
+  const mh=S.conditions.filter(c=>c.kind==='mental');
+  lines.push(mh.length?`- Claiming: ${mh.map(c=>c.name).join(', ')}. Use the 21-0781 worksheet for the event questions.`:'- Not claiming a mental health condition.','');
+  lines.push('STEP: Toxic exposure');
+  const ynt=v=>({yes:'Yes',no:'No',unsure:'Not sure'})[v]||'[answer]';
+  lines.push(`- Gulf War / Southwest Asia / Afghanistan service: ${ynt(E.gulf)}${E.gulfWhere?` (${E.gulfWhere})`:''}`,`- Burn pits or airborne hazards: ${ynt(E.burnpit)}${E.hazards?` (${E.hazards})`:''}`,`- Agent Orange locations: ${ynt(E.agentOrange)}`,`- Other exposures: ${E.other||'None listed'}`,'');
+  lines.push('STEP: Supporting evidence','- Service treatment records: VA requests them for online claims. Upload your own copy if you have it.','- Upload: personal statement for each condition (21-4138)');
+  const got=S.witnesses.filter(w=>w.status==='received');
+  lines.push(`- Upload: buddy statements (21-10210)${got.length?': '+got.map(w=>w.name).join(', '):''}`);
+  const nx=S.conditions.filter(c=>c.nexus==='have');
+  if(nx.length)lines.push(`- Upload: medical opinions for ${nx.map(c=>c.name).join(', ')}`);
+  lines.push('- Private medical records, or authorize VA to get them with 21-4142/4142a','');
+  if(p.sep&&parseDate(p.sep)>new Date())lines.push('STEP: BDD',`- Separation date: ${fmt(parseDate(p.sep))}. Submit between ${fmt(bdd().open)} and ${fmt(bdd().close)}.`,'- Upload the Separation Health Assessment Part A.','- You must be available for exams for 45 days after filing.','');
+  lines.push('Read every answer before you submit. You sign the claim, so make sure each statement is true.');
+  return lines.join('\n');
+}
+function genRecords(){
+  return ['RECORDS TO REQUEST','',
+  '[Duty side]','- Complete service treatment records, including dental and behavioral health (clinic records office, or your branch\'s records portal)','- Physical profiles and line-of-duty determinations','- Deployment health assessments (pre, post and reassessment)','- Hearing conservation audiograms','- Separation Health Assessment Part A and Part B','- DD-214 after separation (BDD can be filed without it)','- Personnel records showing deployments and duties (if needed for exposure or events)','',
+  '[Off-duty side]','- Civilian doctor, urgent care, ER, chiropractor and physical therapy records','- Pharmacy history','- Or sign VA Form 21-4142 and 21-4142a so VA requests them','',
+  'Conditions and where they show up:',
+  ...S.conditions.map(c=>`- ${or(c.name,'condition')}: ${c.str||'[add the record dates]'}`)].join('\n');
+}
+function docOptions(d){
+  if(d.for==='cond')return S.conditions.map(c=>[c.id,c.name||'Untitled']);
+  if(d.for==='mh')return S.conditions.filter(c=>c.kind==='mental').map(c=>[c.id,c.name||'Untitled']);
+  if(d.for==='wit')return S.witnesses.map(w=>[w.id,w.name||'Unnamed']);
+  return [];
+}
+function genDoc(id,ref){
+  const c=S.conditions.find(x=>x.id===ref),w=S.witnesses.find(x=>x.id===ref);
+  switch(id){
+   case '526':return gen526();case 'records':return genRecords();
+   case 'stmt':return c?genStmt(c):'';case 'cp':return c?genCP(c):'';case 'nexus':return c?genNexus(c):'';case '0781':return c?gen0781(c):'';
+   case 'buddyask':return w?genBuddyAsk(w)+'\n\n----\n\n'+genBuddy(w):'';case 'buddy':return w?genBuddy(w):'';
+  }return '';
+}
+function vDocs(){
+  let sel=S.docSel||{id:'526',ref:''};const d=DOCS.find(x=>x.id===sel.id)||DOCS[0];
+  const opts=docOptions(d);if(d.for!=='all'&&!opts.find(o=>o[0]===sel.ref))sel.ref=opts[0]?opts[0][0]:'';
+  const key=d.id+':'+sel.ref,edited=S.docEdits[key]!=null,text=edited?S.docEdits[key]:genDoc(d.id,sel.ref);
+  const picks=DOCS.map(x=>{const n=x.for==='all'?1:docOptions(x).length;return `<button class="doc-pick" aria-pressed="${x.id===d.id}" data-pick="${x.id}"><span class="form">${x.form}</span><span class="nm">${x.name}</span><span class="st">${x.for==='all'?'One document':n?`${n} to prepare`:'Nothing to prepare yet'}</span></button>`;}).join('');
+  const empty=d.for!=='all'&&!opts.length?`<div class="panel muted">${d.for==='wit'?'Add a person under Witnesses first.':d.for==='mh'?'Add a mental health condition first.':'Add a condition first.'}</div>`:'';
+  return `<div class="stack"><h2>Documents</h2><p class="muted">Each document is written from what you entered. Edit it here, then copy it into VA.gov, an email, or a Word file. Nothing is sent anywhere.</p>
+   <div class="doc-list">${picks}</div>
+   ${empty||`<div class="panel stack">
+    <div class="row" style="justify-content:space-between"><h3>${esc(d.name)} <span class="mono muted">${esc(d.form)}</span></h3>
+     ${opts.length?`<select id="docRef" style="width:auto;max-width:100%">${opts.map(o=>`<option value="${o[0]}" ${o[0]===sel.ref?'selected':''}>${esc(o[1])}</option>`).join('')}</select>`:''}</div>
+    ${edited?'<p class="small" style="color:var(--warn)">You edited this text. It no longer updates from your answers until you reset it.</p>':''}
+    <textarea class="doc" id="docText" spellcheck="true">${esc(text)}</textarea>
+    <div class="row"><button class="btn primary" id="copyDoc">Copy text</button><button class="btn" id="resetDoc">Reset to generated text</button>
+     <label class="row small" style="margin-left:auto"><input type="checkbox" id="docDone" ${S.docDone[key]?'checked':''}> Final and ready to submit</label></div>
+    <p class="small muted">Words in [brackets] are blanks still to fill.</p>
+   </div>`}</div>`;
+}
+function bindDocs(){
+  document.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{S.docSel={id:b.dataset.pick,ref:''};save();render();});
+  const r=$('#docRef');if(r)r.onchange=()=>{S.docSel.ref=r.value;save();render();};
+  const key=()=>S.docSel.id+':'+(S.docSel.ref||'');
+  const t=$('#docText');if(!t)return;
+  t.oninput=()=>{S.docEdits[key()]=t.value;save();};
+  $('#copyDoc').onclick=()=>{const v=t.value;const fallback=()=>{t.focus();t.select();toast('Text selected. Press copy.');};
+    try{navigator.clipboard.writeText(v).then(()=>toast('Copied'),fallback);}catch(e){fallback();}};
+  const rs=$('#resetDoc');if(rs)rs.onclick=()=>{delete S.docEdits[key()];save();render();};
+  $('#docDone').onchange=e=>{S.docDone[key()]=e.target.checked;save();};
+}
+
+function vBackup(){
+  return `<div class="stack">
+  <div class="panel stack"><h2>Your data stays here</h2><p>Everything you type is saved only in this browser on this device. Nothing is uploaded, and this app never submits anything to VA. If you clear your browser data or switch phones, it is gone, so copy a backup now and then and keep it somewhere private (a note or file only you can open).</p>
+   <div class="row"><button class="btn primary" id="copyBackup">Copy backup</button><button class="btn" id="showImport">Restore from backup</button><span id="wipeWrap"><button class="btn danger" id="wipe">Erase everything</button></span></div>
+   <div id="importBox" hidden class="stack"><label class="f">Paste a backup, or pick a backup file<textarea id="importText"></textarea></label><input type="file" id="importFile" accept=".json,.txt,application/json,text/plain"><div class="row"><button class="btn primary" id="doImport">Restore</button></div><p id="importMsg" class="small"></p></div>
+   <textarea id="backupText" class="doc" style="min-height:80px" hidden readonly></textarea>
+  </div>
+  <div class="panel stack"><h2>Get free help</h2>
+   <p>A Veterans Service Officer (VSO) or VA-accredited representative reviews your claim for free and can catch missing evidence. Find one through TAP, your installation's transition office, DAV, VFW, American Legion, or your state veterans affairs office. You can check anyone's accreditation at the VA Office of General Counsel search. Never pay anyone to file an initial claim.</p>
+  </div>
+  <div class="panel stack"><h2>Official links</h2><ul class="stack" style="gap:4px;padding-left:18px;margin:0">
+   <li><a href="https://www.va.gov/disability/how-to-file-claim/when-to-file/pre-discharge-claim/" target="_blank" rel="noopener">Pre-discharge (BDD) claims</a></li>
+   <li><a href="https://www.va.gov/disability/file-disability-claim-form-21-526ez/" target="_blank" rel="noopener">File the 21-526EZ online</a></li>
+   <li><a href="https://www.va.gov/resources/your-intent-to-file-a-va-claim/" target="_blank" rel="noopener">Intent to file</a></li>
+   <li><a href="https://www.va.gov/supporting-forms-for-claims/lay-witness-statement-form-21-10210/" target="_blank" rel="noopener">Lay/witness statement, 21-10210</a></li>
+   <li><a href="https://www.va.gov/forms/21-4138/" target="_blank" rel="noopener">Statement in support of claim, 21-4138</a></li>
+   <li><a href="https://www.va.gov/forms/21-0781/" target="_blank" rel="noopener">Mental health event statement, 21-0781</a></li>
+   <li><a href="https://www.va.gov/disability/eligibility/pact-act/" target="_blank" rel="noopener">PACT Act and toxic exposure</a></li>
+   <li><a href="https://www.va.gov/get-help-from-accredited-representative/" target="_blank" rel="noopener">Find an accredited representative</a></li>
+  </ul><p class="small muted">VA rules change. Check each form on VA.gov before you file. This workbook is a personal tool, not legal or medical advice.</p></div>
+  </div>`;
+}
+function bindBackup(){
+  $('#copyBackup').onclick=()=>{const v=JSON.stringify(Object.assign({},S,{app:'claimkit',saved:new Date().toISOString()}));const ta=$('#backupText');ta.value=v;
+    const fb=()=>{ta.hidden=false;ta.focus();ta.select();toast('Backup selected. Press copy.');};try{navigator.clipboard.writeText(v).then(()=>toast('Backup copied'),fb);}catch(e){fb();}};
+  $('#showImport').onclick=()=>{$('#importBox').hidden=false;};
+  $('#importFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{$('#importText').value=rd.result;};rd.readAsText(f);};
+  $('#doImport').onclick=()=>{try{const o=JSON.parse($('#importText').value);if(!o||!Array.isArray(o.conditions))throw 0;delete o.app;delete o.saved;S=Object.assign(blankState(),o);S.tab='dash';save();render();toast('Backup restored');}catch(e){$('#importMsg').textContent='That text is not a Claim Kit backup. Copy the whole backup, from the first { to the last }.';}};
+  $('#wipe').onclick=()=>{$('#wipeWrap').innerHTML='<span class="confirm small">Erase all claim data in this browser? <button class="btn sm danger" id="wipeYes">Erase</button><button class="btn sm" id="wipeNo">Cancel</button></span>';
+    $('#wipeYes').onclick=()=>{S=blankState();try{localStorage.removeItem(KEY);}catch(e){}save();render();toast('Erased');};$('#wipeNo').onclick=()=>render();};
+}
+
+const VIEWS={dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup]};
+function render(){
+  if(!VIEWS[S.tab])S.tab='dash';
+  renderTabs();renderBanner();
+  const [v,b]=VIEWS[S.tab];
+  $('#main').innerHTML=`<section class="view" role="tabpanel" aria-labelledby="tab-${S.tab}">${v()}</section>`;
+  b();
+}
+load();
+const h=(location.hash||'').slice(1);if(VIEWS[h])S.tab=h;
+render();
+})();
+</script>
