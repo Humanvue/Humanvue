@@ -148,6 +148,7 @@ a{color:var(--study)}
 .calc-head .big{font-family:var(--f-display);font-weight:700;font-size:3rem;line-height:1;font-variant-numeric:tabular-nums}
 .eyebrow-s{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
 .calc-row{display:grid;grid-template-columns:minmax(0,1fr) 120px 170px 36px;gap:8px;align-items:center;padding-block:6px;border-bottom:1px solid var(--line)}
+.calc-row .why{grid-column:1/-1;margin:0}
 .calc-row .nm{font-weight:600;min-width:0;overflow-wrap:anywhere}
 @media (max-width:560px){.calc-row{grid-template-columns:1fr 1fr}.calc-row>:first-child{grid-column:1/-1}.calc-row>:last-child:empty{display:none}}
 @media (prefers-reduced-motion:no-preference){.bar>span,.ring circle{transition:all .4s ease}}
@@ -824,7 +825,8 @@ function vCalc(){
      ${extra?`<input type="text" id="cn-${r.id}" data-ck="name" value="${esc(r.name)}" aria-label="Condition name">`:`<span class="nm">${esc(r.name)}</span>`}
      <select id="cp-${r.id}" data-ck="pct" aria-label="Rating for ${esc(r.name)}">${pctOpts(r.pct)}</select>
      <select id="cl-${r.id}" data-ck="limb" aria-label="Body part for ${esc(r.name)}">${limbOpts(r.limb)}</select>
-     ${extra?`<button class="btn sm" data-cdel="${r.id}" aria-label="Remove">✕</button>`:'<span></span>'}</div>`;
+     ${extra?`<button class="btn sm" data-cdel="${r.id}" aria-label="Remove">✕</button>`:'<span></span>'}
+     ${r.why?`<p class="why small muted">${esc(r.why)}</p>`:''}</div>`;
   const rated=R.rows.filter(r=>+r.pct>0).map(r=>+r.pct).sort((a,b)=>b-a);
   return `<div class="stack"><div class="panel stack"><div class="calc-head">
      <div><div class="eyebrow-s">Combined rating</div><div class="big">${R.rounded}%</div><div class="small muted">Exact value ${R.exact}${R.bilUsed?`, including a bilateral factor of ${R.bilFactor}`:''}</div></div>
