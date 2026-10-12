@@ -891,7 +891,7 @@ const TRICARE_SELECT=186.96,PART_B=202.90;
 const money0=n=>n.toLocaleString(undefined,{style:'currency',currency:'USD',maximumFractionDigits:0});
 function bracketTax(income,br){let tax=0,low=0;for(const[top,rate]of br){if(income<=low)break;tax+=(Math.min(income,top)-low)*rate;low=top;}return tax;}
 const SS_AGE={62:.70,67:1,70:1.24};
-function planView(){S.planView=Object.assign({date:'2027-09-30',job:'rn',city:'tc',stage:'start',va:'est',ss:'67',debt:'now',pay:'cash'},S.planView||{});return S.planView;}
+function planView(){S.planView=Object.assign({date:'2027-09-30',job:'rn',city:'tc',stage:'start',va:'est',ss:'67',debt:'now',pay:'cash',mngi:'on'},S.planView||{});return S.planView;}
 function planResult(R,over){
   const P=S.plan,V=Object.assign({},planView(),over||{}),O=P.options[V.date]||P.options[Object.keys(P.options)[0]];
   const mult=Math.min(.75,.025*O.points/360),retGross=Math.round(O.high3*mult);
@@ -975,39 +975,42 @@ function dnpMonths(R){ // month-by-month budget while in the DNP program
   const rn1=planResult(R,{job:'rn',stage:'start'}),rnX=planResult(R,{job:'rn',stage:'exp'});
   const disc=D.discount,rows=[];let [y,m]=D.start.split('-').map(Number);m--;
   const retireMonth=+V.date.slice(0,4)*12+(+V.date.slice(5,7)-1);
-  let loanYear={},loanTotal=0;
+  let loanYear={},loanTotal=0,stYear={},stTotal=0;const stOn=D.stateAid&&V.mngi!=='off';
   D.terms.forEach((cr,ti)=>{
     const tuition=cr*D.perCredit*(1-disc),perMonth=tuition/4;
     for(let k=0;k<4;k++){
       const idx=y*12+m,since=idx-retireMonth;
       const onOrders=since<=0,X=onOrders?null:(since<=12?rn1:rnX);
       const take=onOrders?P.budget.nowIncome:X.net,spend=planResult(R).spend;
-      let aid=0,cash=perMonth,note='';
-      if(V.pay==='loan'){const ay=y+(m>=6?1:0);loanYear[ay]=(loanYear[ay]||0);const room=Math.max(0,D.loanAnnual-loanYear[ay]);aid=Math.min(perMonth,room);loanYear[ay]+=aid;loanTotal+=aid;cash=perMonth-aid;}
+      let aid=0,cash=perMonth,st=0;
+      if(stOn&&V.pay!=='vre'){const fy=y+(m>=6?1:0),room=Math.min(Math.max(0,D.stateAid.perYear-(stYear[fy]||0)),Math.max(0,D.stateAid.lifetime-stTotal));st=Math.min(perMonth,room);stYear[fy]=(stYear[fy]||0)+st;stTotal+=st;cash=perMonth-st;}
+      if(V.pay==='loan'){const ay=y+(m>=6?1:0);loanYear[ay]=(loanYear[ay]||0);const room=Math.max(0,D.loanAnnual-loanYear[ay]);aid=Math.min(cash,room);loanYear[ay]+=aid;loanTotal+=aid;cash=cash-aid;}
       if(V.pay==='vre'){aid=perMonth+D.vreSub;cash=0;}
-      rows.push({y,m,label:`${MON[m]} ${y}`,term:ti+1,cr,take,spend,tuition:perMonth,aid,left:take-spend-cash+(V.pay==='vre'?D.vreSub:0),job:onOrders?'AGR':(since<=12?'RN, first year':'RN')});
+      rows.push({y,m,label:`${MON[m]} ${y}`,term:ti+1,cr,take,spend,tuition:perMonth,aid,st,left:take-spend-cash+(V.pay==='vre'?D.vreSub:0),job:onOrders?'AGR':(since<=12?'RN, first year':'RN')});
       m++;if(m>11){m=0;y++;}
     }
   });
-  rows.loanTotal=loanTotal;return rows;
+  rows.loanTotal=loanTotal;rows.stTotal=stTotal;return rows;
 }
 function vDnp(R){
   const P=S.plan,D=P.dnp,V=planView();if(!D||!P.budget)return'';
   const rows=dnpMonths(R),total=D.terms.reduce((a,c)=>a+c,0)*D.perCredit*(1-D.discount);
   const seg=(key,opts)=>`<div class="seg" role="group">${opts.map(([v,n])=>`<button class="btn sm ${V[key]===v?'on':''}" data-pv="${key}" data-val="${v}" aria-pressed="${V[key]===v}">${n}</button>`).join('')}</div>`;
-  const byYear={};rows.forEach(r=>{const Y=byYear[r.y]=byYear[r.y]||{take:0,spend:0,tuition:0,aid:0,left:0,n:0};['take','spend','tuition','aid','left'].forEach(k=>Y[k]+=r[k]);Y.n++;});
+  const byYear={};rows.forEach(r=>{const Y=byYear[r.y]=byYear[r.y]||{take:0,spend:0,tuition:0,st:0,aid:0,left:0,n:0};['take','spend','tuition','st','aid','left'].forEach(k=>Y[k]+=r[k]);Y.n++;});
   const f=n=>money0(Math.round(n)),sg=n=>`<span class="${n>=0?'pos':'neg'}">${n>=0?'':'−'}${f(Math.abs(n))}</span>`;
-  let last=null,body='';
-  rows.forEach(r=>{if(last!==null&&r.y!==last){const Y=byYear[last];body+=`<tr class="yr"><td>${last} total (${Y.n} mo)</td><td>${f(Y.take)}</td><td>${f(Y.spend)}</td><td>${f(Y.tuition)}</td><td>${f(Y.aid)}</td><td>${sg(Y.left)}</td></tr>`;}last=r.y;
-    body+=`<tr><td>${r.label}<div class="small muted">Term ${r.term}, ${r.cr} credits · ${r.job}</div></td><td>${f(r.take)}</td><td>${f(r.spend)}</td><td>${f(r.tuition)}</td><td>${r.aid?f(r.aid):'—'}</td><td>${sg(r.left)}</td></tr>`;});
-  const Y=byYear[last];body+=`<tr class="yr"><td>${last} total (${Y.n} mo)</td><td>${f(Y.take)}</td><td>${f(Y.spend)}</td><td>${f(Y.tuition)}</td><td>${f(Y.aid)}</td><td>${sg(Y.left)}</td></tr>`;
+  const stCol=D.stateAid&&V.mngi!=='off'&&V.pay!=='vre';let last=null,body='';
+  rows.forEach(r=>{if(last!==null&&r.y!==last){const Y=byYear[last];body+=`<tr class="yr"><td>${last} total (${Y.n} mo)</td><td>${f(Y.take)}</td><td>${f(Y.spend)}</td><td>${f(Y.tuition)}</td>${stCol?`<td>${f(Y.st)}</td>`:''}<td>${f(Y.aid)}</td><td>${sg(Y.left)}</td></tr>`;}last=r.y;
+    body+=`<tr><td>${r.label}<div class="small muted">Term ${r.term}, ${r.cr} credits · ${r.job}</div></td><td>${f(r.take)}</td><td>${f(r.spend)}</td><td>${f(r.tuition)}</td>${stCol?`<td>${r.st?f(r.st):'—'}</td>`:''}<td>${r.aid?f(r.aid):'—'}</td><td>${sg(r.left)}</td></tr>`;});
+  const Y=byYear[last];body+=`<tr class="yr"><td>${last} total (${Y.n} mo)</td><td>${f(Y.take)}</td><td>${f(Y.spend)}</td><td>${f(Y.tuition)}</td>${stCol?`<td>${f(Y.st)}</td>`:''}<td>${f(Y.aid)}</td><td>${sg(Y.left)}</td></tr>`;
   const loanPay=rows.loanTotal?Math.round(rows.loanTotal*(D.loanRate/12)/(1-Math.pow(1+D.loanRate/12,-120))):0;
   return `<div class="panel-in stack"><div class="eyebrow-s">DNP school, month by month</div>
    <p class="small"><b>${esc(D.school)}, ${esc(D.program)}.</b> ${esc(D.summary)}</p>
    <dl class="kv"><dt>Tuition</dt><dd>${D.credits} credits at ${money0(D.perCredit)} = ${money0(D.credits*D.perCredit)}</dd><dt>${esc(D.transferName||'Transfer credits')}</dt><dd>−${D.transfer} credits (${money0(D.transfer*D.perCredit)})</dd><dt>${esc(D.discountName)}</dt><dd>−${Math.round(D.discount*100)}% (${money0((D.credits-D.transfer)*D.perCredit*D.discount)})</dd><dt>You pay</dt><dd><b>${money0(total)}</b> over ${D.terms.length} terms</dd></dl>
    <div><div class="eyebrow-s">Pay tuition with</div>${seg('pay',[['cash','Take-home pay'],['loan','Federal loan'],['vre','VA VR&amp;E']])}</div>
+   ${D.stateAid?`<div><div class="eyebrow-s">${esc(D.stateAid.name)}</div>${seg('mngi',[['on','Use it'],['off','Leave out']])}<p class="small">${V.pay==='vre'?esc(D.stateAid.vreNote):`${esc(D.stateAid.about)} In this view it covers ${money0(rows.stTotal)} of tuition.`}</p></div>`:''}
    <p class="small">${V.pay==='loan'?`Graduate Direct Unsubsidized loans cover up to ${money0(D.loanAnnual)} a year (${money0(D.loanLimit)} lifetime). Grad PLUS loans end for new borrowers on 1 Jul 2026. You would borrow about ${money0(rows.loanTotal)}, then pay about ${money0(loanPay)} a month for 10 years at ${(D.loanRate*100).toFixed(1)}%, or use the income-based Repayment Assistance Plan.`:V.pay==='vre'?`If VA approves you for Veteran Readiness and Employment (VR&amp;E, Chapter 31), it pays tuition, fees and books straight to the school and pays you about ${money0(D.vreSub)} a month while you are enrolled full time. You need a rating of 20% or more and a counselor who agrees the DNP is part of your employment plan, so this is not guaranteed. ${esc(D.vreNote||'')}`:'Tuition comes out of take-home pay each month of the term.'}</p>
-   <div class="tbl-wrap"><table class="mtbl"><thead><tr><th>Month</th><th>Take-home</th><th>Spending</th><th>Tuition</th><th>${V.pay==='vre'?'VR&amp;E':'Loan'}</th><th>Left over</th></tr></thead><tbody>${body}</tbody></table></div>
+   <div class="tbl-wrap"><table class="mtbl"><thead><tr><th>Month</th><th>Take-home</th><th>Spending</th><th>Tuition</th>${stCol?`<th>${esc(D.stateAid.short)}</th>`:''}<th>${V.pay==='vre'?'VR&amp;E':'Loan'}</th><th>Left over</th></tr></thead><tbody>${body}</tbody></table></div>
+   ${D.scholarships?`<div class="stack"><div class="eyebrow-s">Scholarships and loan help to apply for</div><ul class="small">${D.scholarships.map(x=>`<li><b>${esc(x.name)}</b>: ${esc(x.what)}${x.when?` <span class="muted">${esc(x.when)}</span>`:''}</li>`).join('')}</ul></div>`:''}
    <p class="small muted">${esc(D.notes)}</p></div>`;
 }
 function bindPlan(){document.querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{planView()[b.dataset.pv]=b.dataset.val;save();render();});}
