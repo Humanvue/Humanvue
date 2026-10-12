@@ -144,6 +144,12 @@ ul.clean{list-style:none;margin:0;padding:0}
 a{color:var(--study)}
 .kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;font-size:.9rem}
 .kv dt{color:var(--ink-3)}.kv dd{margin:0;font-variant-numeric:tabular-nums}
+.calc-head{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
+.calc-head .big{font-family:var(--f-display);font-weight:700;font-size:3rem;line-height:1;font-variant-numeric:tabular-nums}
+.eyebrow-s{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.calc-row{display:grid;grid-template-columns:minmax(0,1fr) 120px 170px 36px;gap:8px;align-items:center;padding-block:6px;border-bottom:1px solid var(--line)}
+.calc-row .nm{font-weight:600;min-width:0;overflow-wrap:anywhere}
+@media (max-width:560px){.calc-row{grid-template-columns:1fr 1fr}.calc-row>:first-child{grid-column:1/-1}.calc-row>:last-child:empty{display:none}}
 @media (prefers-reduced-motion:no-preference){.bar>span,.ring circle{transition:all .4s ease}}
 </style>
 
@@ -164,6 +170,8 @@ a{color:var(--study)}
 </div>
 <div id="toast" class="toast" hidden></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
 <script>
 (function(){
 'use strict';
@@ -269,7 +277,7 @@ function progress(){
 }
 
 /* ---------- Tabs ---------- */
-const TABS=[['dash','Dashboard'],['steps','Steps'],['me','About me'],['conds','Conditions'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['backup','Backup & help']];
+const TABS=[['dash','Dashboard'],['steps','Steps'],['me','About me'],['conds','Conditions'],['scan','Scan records'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['calc','Calculator'],['backup','Backup & help']];
 function renderTabs(){
   $('#tabs').innerHTML=TABS.map(([id,n])=>`<button role="tab" id="tab-${id}" aria-selected="${S.tab===id}" data-tab="${id}">${n}</button>`).join('');
 }
@@ -320,7 +328,7 @@ function vDash(){
   const docsDone=Object.values(S.docDone).filter(Boolean).length;
   return `<div class="stack">
    <div class="panel"><div class="dash-head">${ring}<div class="stack" style="gap:8px">${chip}<h2>${esc(headline)}</h2>
-   <dl class="kv"><dt>Steps done</dt><dd>${p.tasksDone} of ${TASKS.length}</dd><dt>Evidence points</dt><dd>${p.condPts} of ${p.condMax}</dd><dt>Documents marked final</dt><dd>${docsDone}</dd>${S.claim.filed?`<dt>Filed</dt><dd>${fmt(parseDate(S.claim.filed))}</dd>`:''}</dl></div></div>${tl}</div>
+   <dl class="kv"><dt>Steps done</dt><dd>${p.tasksDone} of ${TASKS.length}</dd><dt>Evidence points</dt><dd>${p.condPts} of ${p.condMax}</dd><dt>Documents marked final</dt><dd>${docsDone}</dd>${(()=>{const R=calcResult();return R.rows.some(r=>+r.pct>0)?`<dt>Estimated rating</dt><dd><button class="link" data-tab="calc">${R.rounded}% · ${money(R.pay)} a month</button></dd>`:''})()}${S.claim.filed?`<dt>Filed</dt><dd>${fmt(parseDate(S.claim.filed))}</dd>`:''}</dl></div></div>${tl}</div>
    <div class="grid2">
     <div class="panel stack"><h3>Up next</h3>${nextHtml}</div>
     <div class="panel stack"><h3>Progress by phase</h3>${phases}<div class="row small muted"><span class="dot duty"></span>Duty-side steps <span class="dot study" style="margin-left:8px"></span>Off-duty steps</div></div>
@@ -665,7 +673,186 @@ function bindBackup(){
     $('#wipeYes').onclick=()=>{S=blankState();try{localStorage.removeItem(KEY);}catch(e){}save();render();toast('Erased');};$('#wipeNo').onclick=()=>render();};
 }
 
-const VIEWS={dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup]};
+/* ---------- Records scanner (runs only in this browser) ---------- */
+const SCAN_TERMS=[
+ {name:'Lower back pain',kind:'physical',re:/\b(low(?:er)? back pain|lumbar (?:strain|sprain|pain|radiculopathy|spondylosis|disc|DDD)|lumbago|lumbosacral|LBP|degenerative disc|M54\.5\d?|M54\.4\d?|M51\.\d+)\b/gi},
+ {name:'Sciatica / radiculopathy',kind:'physical',re:/\b(sciatica|radiculopathy|radicular pain|numbness (?:in|down) (?:the )?(?:left |right )?leg|M54\.1\d?|M54\.3\d?)\b/gi},
+ {name:'Neck pain',kind:'physical',re:/\b(neck pain|cervicalgia|cervical (?:strain|sprain|radiculopathy|spondylosis)|M54\.2)\b/gi},
+ {name:'Knee condition',kind:'physical',re:/\b(knee pain|patellofemoral|chondromalacia|menisc(?:us|al) (?:tear)?|ACL|MCL|knee (?:strain|sprain|effusion|instability)|M22\.\d+|M25\.56\d?)\b/gi},
+ {name:'Shoulder condition',kind:'physical',re:/\b(shoulder (?:pain|impingement|strain|sprain|instability|dislocation)|rotator cuff|labral tear|M25\.51\d?|M75\.\d+)\b/gi},
+ {name:'Hip condition',kind:'physical',re:/\b(hip (?:pain|strain|bursitis|impingement)|trochanteric bursitis|M25\.55\d?)\b/gi},
+ {name:'Ankle condition',kind:'physical',re:/\b(ankle (?:sprain|pain|instability|fracture)|M25\.57\d?|S93\.4\d*)\b/gi},
+ {name:'Foot condition (plantar fasciitis / flat feet)',kind:'physical',re:/\b(plantar fasciitis|pes planus|flat feet|heel pain|M72\.2)\b/gi},
+ {name:'Tinnitus',kind:'physical',re:/\b(tinnitus|ringing in (?:the |my |both )?ears?|H93\.1\d*)\b/gi},
+ {name:'Hearing loss',kind:'physical',re:/\b(hearing loss|threshold shift|STS|sensorineural|H90\.\d+|H91\.\d+)\b/gi},
+ {name:'Migraines / headaches',kind:'physical',re:/\b(migraines?|headaches?|cephalgia|G43\.\d+|G44\.\d+|R51)\b/gi},
+ {name:'Traumatic brain injury',kind:'physical',re:/\b(TBI|concussion|traumatic brain injury|post-?concussive|blast exposure|S06\.\d+)\b/gi},
+ {name:'Sleep apnea',kind:'physical',re:/\b(sleep apnea|OSA|CPAP|polysomnogra\w+|G47\.3\d*)\b/gi},
+ {name:'Insomnia / sleep problems',kind:'mental',re:/\b(insomnia|trouble sleeping|difficulty sleeping|poor sleep|G47\.0\d*|F51\.0\d*)\b/gi},
+ {name:'PTSD',kind:'mental',re:/\b(PTSD|post-?traumatic stress|F43\.1\d*)\b/gi},
+ {name:'Anxiety',kind:'mental',re:/\b(anxiety|generalized anxiety|GAD|panic (?:attacks?|disorder)|F41\.\d+)\b/gi},
+ {name:'Depression',kind:'mental',re:/\b(depression|depressive disorder|MDD|F32\.\d+|F33\.\d+)\b/gi},
+ {name:'Adjustment disorder',kind:'mental',re:/\b(adjustment disorder|F43\.2\d*)\b/gi},
+ {name:'GERD / acid reflux',kind:'physical',re:/\b(GERD|acid reflux|gastro-?esophageal reflux|K21\.\d+)\b/gi},
+ {name:'IBS / stomach problems',kind:'physical',re:/\b(IBS|irritable bowel|K58\.\d+)\b/gi},
+ {name:'Asthma',kind:'physical',re:/\b(asthma|reactive airway|J45\.\d+)\b/gi},
+ {name:'Sinusitis / rhinitis',kind:'physical',re:/\b(sinusitis|rhinitis|J01\.\d+|J30\.\d+|J31\.0|J32\.\d+)\b/gi},
+ {name:'High blood pressure',kind:'physical',re:/\b(hypertension|elevated blood pressure|HTN|I10)\b/gi},
+ {name:'Skin condition',kind:'physical',re:/\b(eczema|dermatitis|psoriasis|pseudofolliculitis barbae|PFB|L20\.\d+|L30\.\d+|L73\.1)\b/gi}
+];
+const DATE_RE=/\b(\d{1,2}\/\d{1,2}\/(?:19|20)\d{2}|(?:19|20)\d{2}-\d{2}-\d{2}|\d{1,2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* (?:19|20)\d{2}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? (?:19|20)\d{2})\b/gi;
+const NEG_RE=/\b(denies|denied|no|negative for|without|not)\b[^.;\n]{0,25}$/i;
+let SCAN={files:[],busy:false,msg:'',results:null};
+function normDate(s){const d=new Date(s.replace(/-/g,'/'));return isNaN(d)?null:d;}
+function scanText(text,file,out){
+  text=text.replace(/\s+/g," ");
+  const dates=[];let m;DATE_RE.lastIndex=0;while((m=DATE_RE.exec(text)))dates.push({i:m.index,s:m[1]});
+  for(const t of SCAN_TERMS){t.re.lastIndex=0;
+    while((m=t.re.exec(text))){
+      const i=m.index,before=text.slice(Math.max(0,i-30),i);
+      let near=null;for(const d of dates){if(d.i<=i&&i-d.i<1500)near=d;if(d.i>i)break;}
+      const r=out[t.name]||(out[t.name]={term:t,hits:[],files:new Set(),dates:[]});
+      r.files.add(file);const neg=NEG_RE.test(before);
+      if(near&&!neg){const nd=normDate(near.s);if(nd)r.dates.push(nd);}
+      r.hits.push({file,neg,date:near?near.s:'',snip:text.slice(Math.max(0,i-90),i+m[0].length+90).replace(/\s+/g,' ').trim(),word:m[0]});
+    }
+  }
+}
+async function readFile(f){
+  if(/\.pdf$/i.test(f.name)||f.type==='application/pdf'){
+    if(!window.pdfjsLib)throw new Error('The PDF reader did not load. Check your connection and reload the page.');
+    const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;let txt='';
+    for(let p=1;p<=pdf.numPages;p++){const c=await (await pdf.getPage(p)).getTextContent();txt+=c.items.map(it=>it.str+(it.hasEOL?'\n':' ')).join('')+'\n';
+      SCAN.msg=`Reading ${f.name}: page ${p} of ${pdf.numPages}`;const el=$('#scanMsg');if(el)el.textContent=SCAN.msg;}
+    return txt;
+  }
+  return await f.text();
+}
+async function runScan(files){
+  SCAN.busy=true;SCAN.results=null;const out={},notes=[];render();
+  for(const f of files){try{const txt=await readFile(f);if(txt.replace(/\s/g,'').length<50)notes.push(`${f.name} has no readable text. It is probably a scanned image; type key details in by hand or ask Claude to read it.`);scanText(txt,f.name,out);}catch(e){notes.push(`${f.name}: ${e.message||'could not be read'}`);}}
+  SCAN.busy=false;SCAN.results=out;SCAN.notes=notes;SCAN.files=files.map(f=>f.name);SCAN.msg='';render();
+}
+function vScan(){
+  const R=SCAN.results;
+  let body='';
+  if(SCAN.busy)body=`<div class="panel"><p id="scanMsg" class="muted">${esc(SCAN.msg||'Reading your records')}</p></div>`;
+  else if(R){
+    const rows=Object.entries(R).filter(([,r])=>r.hits.some(h=>!h.neg)).sort((a,b)=>b[1].hits.length-a[1].hits.length);
+    const notes=(SCAN.notes||[]).map(n=>`<p class="banner small">${esc(n)}</p>`).join('');
+    body=notes+`<p class="muted">Read ${SCAN.files.length} file${SCAN.files.length===1?'':'s'}. Found ${rows.length} possible condition${rows.length===1?'':'s'}. Check each excerpt: a mention is not always a diagnosis.</p>`+
+    rows.map(([name,r],idx)=>{
+      const ds=r.dates.sort((a,b)=>a-b),first=ds[0],last=ds[ds.length-1];
+      const pos=r.hits.filter(h=>!h.neg),negN=r.hits.length-pos.length;
+      const existing=S.conditions.find(c=>c.name.toLowerCase()===name.toLowerCase());
+      return `<div class="panel stack" data-scan="${idx}"><div class="row" style="justify-content:space-between"><h3>${esc(name)}</h3><span class="row"><span class="chip ${r.term.kind==='mental'?'study':'plain'}">${r.term.kind==='mental'?'Mental health':'Physical'}</span><span class="chip warn">${pos.length} mention${pos.length===1?'':'s'}</span></span></div>
+       <dl class="kv"><dt>First dated mention</dt><dd>${first?fmt(first):'No date found'}</dd><dt>Latest</dt><dd>${last?fmt(last):'No date found'}</dd><dt>Files</dt><dd>${esc([...r.files].join(', '))}</dd>${negN?`<dt>Looks like a "no"</dt><dd>${negN} (for example "denies ${esc(r.hits.find(h=>h.neg).word)}")</dd>`:''}</dl>
+       <details><summary class="small" style="cursor:pointer">Show excerpts</summary><ul class="small" style="margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:6px">${pos.slice(0,6).map(h=>`<li><span class="mono">${esc(h.date||'no date')}</span> · ${esc(h.file)}<br><span class="muted">…${esc(h.snip)}…</span></li>`).join('')}</ul></details>
+       <div class="row">${existing?`<button class="btn sm primary" data-scan-add="${idx}" data-into="${existing.id}">Add record dates to "${esc(existing.name)}"</button>`:`<button class="btn sm primary" data-scan-add="${idx}">Add as a new condition</button>`}
+        ${S.conditions.length&&!existing?`<select data-scan-into="${idx}" style="width:auto;max-width:100%" aria-label="Add to an existing condition"><option value="">or add to…</option>${S.conditions.map(c=>`<option value="${c.id}">${esc(c.name||'Untitled')}</option>`).join('')}</select>`:''}</div>
+      </div>`;}).join('');
+    SCAN.rows=rows;
+    if(!rows.length)body+=`<div class="panel muted">No common claim conditions found. The scanner looks for about 25 common conditions; type others in under Conditions.</div>`;
+  }
+  return `<div class="stack"><div class="panel stack"><h2>Scan my records</h2>
+   <p>Pick your record PDFs or text files (service treatment records, MHS Genesis or TRICARE Online downloads, civilian visit notes). The scanner reads them here in your browser and lists conditions it finds, with dates and excerpts. Nothing is uploaded, and the record text is not saved. You choose what to add.</p>
+   <label class="f">Record files<input type="file" id="scanFiles" multiple accept=".pdf,.txt,application/pdf,text/plain"></label>
+   <p class="small muted">Scanned paper records saved as pictures have no text to read. Those need to be typed in, or read by Claude in your project thread.</p></div>${body}</div>`;
+}
+function scanSummary(name,r){
+  const ds=r.dates.sort((a,b)=>a-b);const uniq=[...new Set(ds.map(d=>d.toISOString().slice(0,10)))];
+  return `Records scan: ${r.hits.filter(h=>!h.neg).length} mentions in ${[...r.files].join(', ')}${uniq.length?`; dated ${uniq.slice(0,8).join(', ')}${uniq.length>8?' and more':''}`:''}`;
+}
+function bindScan(){
+  $('#scanFiles').onchange=e=>{const fs=[...e.target.files];if(fs.length)runScan(fs);};
+  const add=(idx,into)=>{const [name,r]=SCAN.rows[idx];const sum=scanSummary(name,r);
+    let c=S.conditions.find(x=>x.id===into);
+    if(c){c.str=c.str?c.str+'\n'+sum:sum;}
+    else{const first=r.dates.sort((a,b)=>a-b)[0];c={id:uid(),name,kind:r.term.kind,cause:'direct',nexus:'maybe',onset:first?first.toISOString().slice(0,7):'',str:sum};S.conditions.push(c);}
+    save();render();toast(into?'Added to '+(c.name||'condition'):'Added '+name);};
+  document.querySelectorAll('[data-scan-add]').forEach(b=>b.onclick=()=>add(+b.dataset.scanAdd,b.dataset.into||''));
+  document.querySelectorAll('[data-scan-into]').forEach(s=>s.onchange=()=>{if(s.value)add(+s.dataset.scanInto,s.value);});
+}
+/* ---------- Rating and pay calculator (VA rates effective Dec 1, 2025) ---------- */
+const RATES_DATE='December 1, 2025';
+const PCT=[30,40,50,60,70,80,90,100];
+// RATE_TABLE[child 0|1][spouse 0|1][parents 0|1|2] -> amounts for 30..100
+const RATE_TABLE=[
+ [[[552.47,795.84,1132.90,1435.02,1808.45,2102.15,2362.30,3938.58],[604.47,865.84,1220.90,1540.02,1931.45,2242.15,2520.30,4114.82],[656.47,935.84,1308.90,1645.02,2054.45,2382.15,2678.30,4291.06]],
+  [[617.47,882.84,1241.90,1566.02,1961.45,2277.15,2559.30,4158.17],[669.47,952.84,1329.90,1671.02,2084.45,2417.15,2717.30,4334.41],[721.47,1022.84,1417.90,1776.02,2207.45,2557.15,2875.30,4510.65]]],
+ [[[596.47,853.84,1205.90,1523.02,1910.45,2219.15,2494.30,4085.43],[648.47,923.84,1293.90,1628.02,2033.45,2359.15,2652.30,4261.67],[700.47,993.84,1381.90,1733.02,2156.45,2499.15,2810.30,4437.91]],
+  [[666.47,947.84,1322.90,1663.02,2074.45,2406.15,2704.30,4318.99],[718.47,1017.84,1410.90,1768.02,2197.45,2546.15,2862.30,4495.23],[770.47,1087.84,1498.90,1873.02,2320.45,2686.15,3020.30,4671.47]]]
+];
+const ADD_CHILD=[32,43,54,65,76,87,98,109.11],ADD_SCHOOL=[105,140,176,211,246,281,317,352.45],ADD_AA=[61,81,101,121,141,161,181,201.41];
+const LOW={0:0,10:180.42,20:356.66};
+function combine(list){ // VA "whole person" method; returns unrounded combined value
+  let eff=0;[...list].sort((a,b)=>b-a).forEach(r=>{eff=Math.round(eff+(100-eff)*r/100);});return eff;
+}
+function combinedRating(rows){
+  const rated=rows.filter(r=>+r.pct>0);
+  const has=l=>rated.some(r=>r.limb===l);
+  const arms=has('la')&&has('ra'),legs=has('ll')&&has('rl');
+  let bil=[],other=[];
+  rated.forEach(r=>{const isArm=r.limb==='la'||r.limb==='ra',isLeg=r.limb==='ll'||r.limb==='rl';
+    if((arms&&isArm)||(legs&&isLeg))bil.push(+r.pct);else other.push(+r.pct);});
+  let bilValue=0,bilFactor=0,list=other.slice();
+  if(bil.length>1){bilValue=combine(bil);bilFactor=Math.round(bilValue*0.1*10)/10;list.push(bilValue+bilFactor);}
+  else list=list.concat(bil);
+  const exact=combine(list);
+  const rounded=Math.min(100,Math.round(exact/10)*10);
+  return{exact,rounded,bilValue,bilFactor,bilUsed:bil.length>1};
+}
+function monthlyPay(r,D){
+  if(r<30)return LOW[r]||0;
+  const i=PCT.indexOf(r);const u18=Math.max(0,+D.kids||0),sch=Math.max(0,+D.school||0);const anyChild=u18+sch>0?1:0;
+  let amt=RATE_TABLE[anyChild][D.spouse?1:0][Math.min(2,+D.parents||0)][i];
+  let extraU18=u18,extraSch=sch;if(anyChild){if(u18)extraU18--;else extraSch--;}
+  amt+=extraU18*ADD_CHILD[i]+extraSch*ADD_SCHOOL[i];
+  if(D.spouse&&D.aa)amt+=ADD_AA[i];
+  return Math.round(amt*100)/100;
+}
+const money=n=>n.toLocaleString(undefined,{style:'currency',currency:'USD'});
+function calcState(){S.calc=S.calc||{rows:{},extra:[],dep:{}};return S.calc;}
+function calcRows(){const C=calcState();
+  return S.conditions.map(c=>Object.assign({id:c.id,name:c.name||'Untitled',pct:'',limb:''},C.rows[c.id]||{},{name:c.name||'Untitled',id:c.id})).concat(C.extra);}
+function calcResult(){const rows=calcRows(),R=combinedRating(rows),pay=monthlyPay(R.rounded,calcState().dep);return Object.assign(R,{pay,rows});}
+function vCalc(){
+  const C=calcState(),D=C.dep,R=calcResult();
+  const pctOpts=v=>['',0,10,20,30,40,50,60,70,80,90,100].map(p=>`<option value="${p}" ${String(p)===String(v)?'selected':''}>${p===''?'Not rated':p+'%'}</option>`).join('');
+  const limbOpts=v=>[['','Not an arm or leg'],['la','Left arm'],['ra','Right arm'],['ll','Left leg'],['rl','Right leg']].map(([k,n])=>`<option value="${k}" ${k===v?'selected':''}>${n}</option>`).join('');
+  const row=(r,extra)=>`<div class="calc-row" data-crow="${r.id}" data-extra="${extra?1:0}">
+     ${extra?`<input type="text" id="cn-${r.id}" data-ck="name" value="${esc(r.name)}" aria-label="Condition name">`:`<span class="nm">${esc(r.name)}</span>`}
+     <select id="cp-${r.id}" data-ck="pct" aria-label="Rating for ${esc(r.name)}">${pctOpts(r.pct)}</select>
+     <select id="cl-${r.id}" data-ck="limb" aria-label="Body part for ${esc(r.name)}">${limbOpts(r.limb)}</select>
+     ${extra?`<button class="btn sm" data-cdel="${r.id}" aria-label="Remove">✕</button>`:'<span></span>'}</div>`;
+  const rated=R.rows.filter(r=>+r.pct>0).map(r=>+r.pct).sort((a,b)=>b-a);
+  return `<div class="stack"><div class="panel stack"><div class="calc-head">
+     <div><div class="eyebrow-s">Combined rating</div><div class="big">${R.rounded}%</div><div class="small muted">Exact value ${R.exact}${R.bilUsed?`, including a bilateral factor of ${R.bilFactor}`:''}</div></div>
+     <div><div class="eyebrow-s">Monthly payment</div><div class="big">${money(R.pay)}</div><div class="small muted">${money(R.pay*12)} a year, tax free</div></div></div>
+     <p class="small muted">${rated.length?`VA does not add ratings. It combines them: ${rated.map(p=>p+'%').join(' + ')} works out to ${R.exact}, which rounds to ${R.rounded}%.`:'Pick an expected rating for each condition to see your estimate.'} Rates effective ${RATES_DATE}. VA adjusts them each December.</p></div>
+   <div class="panel stack"><h3>Expected ratings</h3><p class="small muted">Choose the rating you expect for each condition. Ratings come from VA's rating schedule (38 CFR Part 4) after your exams, so treat this as a what-if. Mark arms and legs so the bilateral factor is applied when both sides are rated.</p>
+     ${R.rows.length?R.rows.map(r=>row(r,C.extra.includes(r))).join(''):''}
+     <div class="row"><button class="btn sm" id="addCalcRow">Add a condition just for the calculator</button></div></div>
+   <div class="panel stack"><h3>Dependents</h3><p class="small muted">Dependents raise the payment at 30% and above.</p><div class="grid2">
+     <label class="row small"><input type="checkbox" id="d-spouse" data-dk="spouse" ${D.spouse?'checked':''}> Married</label>
+     <label class="row small"><input type="checkbox" id="d-aa" data-dk="aa" ${D.aa?'checked':''} ${D.spouse?'':'disabled'}> Spouse needs aid and attendance</label>
+     ${field('d-kids','Children under 18',D.kids||'0',{k:'kids',type:'select',options:[0,1,2,3,4,5,6].map(n=>[String(n),String(n)])})}
+     ${field('d-school','Children 18 to 23 in school',D.school||'0',{k:'school',type:'select',options:[0,1,2,3,4].map(n=>[String(n),String(n)])})}
+     ${field('d-parents','Dependent parents',D.parents||'0',{k:'parents',type:'select',options:[['0','0'],['1','1'],['2','2']]})}
+   </div></div></div>`;
+}
+function bindCalc(){
+  const C=calcState();
+  document.querySelectorAll('[data-crow]').forEach(el=>{const id=el.dataset.crow,isX=el.dataset.extra==='1';
+    el.querySelectorAll('[data-ck]').forEach(inp=>inp.addEventListener(inp.tagName==='SELECT'?'change':'input',()=>{
+      const tgt=isX?C.extra.find(x=>x.id===id):(C.rows[id]=C.rows[id]||{});tgt[inp.dataset.ck]=inp.value;save();if(inp.tagName==='SELECT')render();}));});
+  document.querySelectorAll('[data-cdel]').forEach(b=>b.onclick=()=>{C.extra=C.extra.filter(x=>x.id!==b.dataset.cdel);save();render();});
+  $('#addCalcRow').onclick=()=>{C.extra.push({id:uid(),name:'',pct:'',limb:''});save();render();};
+  document.querySelectorAll('[data-dk]').forEach(el=>el.onchange=()=>{C.dep[el.dataset.dk]=el.checked;if(!C.dep.spouse)C.dep.aa=false;save();render();});
+  document.querySelectorAll('select[data-k]').forEach(el=>el.onchange=()=>{C.dep[el.dataset.k]=el.value;save();render();});
+}
+
+const VIEWS={calc:[vCalc,bindCalc],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup]};
 function render(){
   if(!VIEWS[S.tab])S.tab='dash';
   renderTabs();renderBanner();
