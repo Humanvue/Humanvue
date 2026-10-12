@@ -150,6 +150,10 @@ a{color:var(--study)}
 .calc-row{display:grid;grid-template-columns:minmax(0,1fr) 120px 170px 36px;gap:8px;align-items:center;padding-block:6px;border-bottom:1px solid var(--line)}
 .calc-row .why{grid-column:1/-1;margin:0}
 .calc-row .nm{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.seg{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}.seg .btn.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.pl-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start;padding:8px 0 8px 10px;border-bottom:1px solid var(--line);border-left:4px solid var(--line)}
+.pl-row.duty{border-left-color:var(--duty)}.pl-row.study{border-left-color:var(--study)}.pl-row .amt{font-variant-numeric:tabular-nums;font-weight:600}
+details.panel>summary{cursor:pointer}
 @media (max-width:560px){.calc-row{grid-template-columns:1fr 1fr}.calc-row>:first-child{grid-column:1/-1}.calc-row>:last-child:empty{display:none}}
 @media (prefers-reduced-motion:no-preference){.bar>span,.ring circle{transition:all .4s ease}}
 </style>
@@ -329,7 +333,7 @@ function vDash(){
   const docsDone=Object.values(S.docDone).filter(Boolean).length;
   return `<div class="stack">
    <div class="panel"><div class="dash-head">${ring}<div class="stack" style="gap:8px">${chip}<h2>${esc(headline)}</h2>
-   <dl class="kv"><dt>Steps done</dt><dd>${p.tasksDone} of ${TASKS.length}</dd><dt>Evidence points</dt><dd>${p.condPts} of ${p.condMax}</dd><dt>Documents marked final</dt><dd>${docsDone}</dd>${(()=>{const R=calcResult();return R.rows.some(r=>+r.pct>0)?`<dt>Estimated rating</dt><dd><button class="link" data-tab="calc">${R.rounded}% · ${money(R.pay)} a month</button></dd>`:''})()}${S.claim.filed?`<dt>Filed</dt><dd>${fmt(parseDate(S.claim.filed))}</dd>`:''}</dl></div></div>${tl}</div>
+   <dl class="kv"><dt>Steps done</dt><dd>${p.tasksDone} of ${TASKS.length}</dd><dt>Evidence points</dt><dd>${p.condPts} of ${p.condMax}</dd><dt>Documents marked final</dt><dd>${docsDone}</dd>${(()=>{const R=calcResult();return R.rows.some(r=>+r.pct>0)?`<dt>Estimated rating</dt><dd><button class="link" data-tab="calc">${R.rounded}% · ${money(R.pay)} a month</button></dd>`:''})()}${S.plan?(()=>{const X=planResult(calcResult());return `<dt>Retired take-home</dt><dd><button class="link" data-tab="calc">${money0(X.net)} a month · ${esc(X.O.label)}, ${JOBS[X.V.job].name}, ${CITY[X.V.city]}</button></dd>`;})():''}${S.claim.filed?`<dt>Filed</dt><dd>${fmt(parseDate(S.claim.filed))}</dd>`:''}</dl></div></div>${tl}</div>
    <div class="grid2">
     <div class="panel stack"><h3>Up next</h3>${nextHtml}</div>
     <div class="panel stack"><h3>Progress by phase</h3>${phases}<div class="row small muted"><span class="dot duty"></span>Duty-side steps <span class="dot study" style="margin-left:8px"></span>Off-duty steps</div></div>
@@ -563,7 +567,7 @@ function gen0781(c){const e=c.ev||{};
 }
 function gen526(){
   const p=P(),E=S.exposure,lines=['VA FORM 21-526EZ ANSWERS (paste into VA.gov)',`Prepared ${fmt(new Date())}`,''];
-  lines.push('STEP: Veteran details','- VA.gov prefills your name, contact details and service periods. Check them against:',`  Branch: ${or(p.branch,'branch')} (${or(p.component,'component')})`,`  Service: ${or(fmt(parseDate(p.entry)),'start')} to ${or(fmt(parseDate(p.sep)),'separation date')}`,'');
+  lines.push('STEP: Veteran details','- VA.gov prefills your name, contact details and service periods. Check them against:',`  Branch: ${or(p.branch,'branch')} (${or(p.component,'component')})`,`  Service: ${or(fmt(parseDate(p.entry)),'start')} to ${or(fmt(parseDate(p.sep)),'separation date')}`,...(p.periods&&p.periods.length?['  Service periods and federal orders (from your records):',...p.periods.map(x=>'   - '+x)]:[]),'');
   lines.push('STEP: Conditions');
   if(!S.conditions.length)lines.push('- [Add conditions in the app]');
   S.conditions.forEach((c,i)=>{
@@ -835,13 +839,14 @@ function vCalc(){
    <div class="panel stack"><h3>Expected ratings</h3><p class="small muted">Choose the rating you expect for each condition. Ratings come from VA's rating schedule (38 CFR Part 4) after your exams, so treat this as a what-if. Mark arms and legs so the bilateral factor is applied when both sides are rated.</p>
      ${R.rows.length?R.rows.map(r=>row(r,C.extra.includes(r))).join(''):''}
      <div class="row"><button class="btn sm" id="addCalcRow">Add a condition just for the calculator</button></div></div>
-   <div class="panel stack"><h3>Dependents</h3><p class="small muted">Dependents raise the payment at 30% and above.</p><div class="grid2">
+   ${vPlan(R)}
+   <details class="panel"><summary><b>Dependents</b> <span class="small muted">${D.spouse||+D.kids||+D.school||+D.parents?'added':'none, single rate'}</span></summary><p class="small muted">Dependents raise the payment at 30% and above.</p><div class="grid2">
      <label class="row small"><input type="checkbox" id="d-spouse" data-dk="spouse" ${D.spouse?'checked':''}> Married</label>
      <label class="row small"><input type="checkbox" id="d-aa" data-dk="aa" ${D.aa?'checked':''} ${D.spouse?'':'disabled'}> Spouse needs aid and attendance</label>
      ${field('d-kids','Children under 18',D.kids||'0',{k:'kids',type:'select',options:[0,1,2,3,4,5,6].map(n=>[String(n),String(n)])})}
      ${field('d-school','Children 18 to 23 in school',D.school||'0',{k:'school',type:'select',options:[0,1,2,3,4].map(n=>[String(n),String(n)])})}
      ${field('d-parents','Dependent parents',D.parents||'0',{k:'parents',type:'select',options:[['0','0'],['1','1'],['2','2']]})}
-   </div></div></div>`;
+   </div></details></div>`;
 }
 function bindCalc(){
   const C=calcState();
@@ -852,7 +857,74 @@ function bindCalc(){
   $('#addCalcRow').onclick=()=>{C.extra.push({id:uid(),name:'',pct:'',limb:''});save();render();};
   document.querySelectorAll('[data-dk]').forEach(el=>el.onchange=()=>{C.dep[el.dataset.dk]=el.checked;if(!C.dep.spouse)C.dep.aa=false;save();render();});
   document.querySelectorAll('select[data-k]').forEach(el=>el.onchange=()=>{C.dep[el.dataset.k]=el.value;save();render();});
+  bindPlan();
 }
+
+/* ---------- Retirement income planner (today's dollars; personal numbers come from S.plan in your backup) ---------- */
+const JOBS={
+ rn:{name:'BSN RN',cities:{
+   tc:{start:90000,exp:100860,src:'Year 1 is about $43 an hour full time on a union new-grad scale. Experienced is the BLS median for RNs in Minneapolis–St. Paul (May 2024).'},
+   roch:{start:83000,exp:106510,src:'Year 1 uses Mayo Clinic\'s posted RN minimum of $39.84 an hour (new-grad residency hires have had up to a $12,500 bonus). Experienced is the BLS mean for RNs in Rochester (May 2025).'}}},
+ np:{name:'PMHNP with a DNP',cities:{
+   tc:{start:140000,exp:161000,src:'PayScale puts psychiatric NPs in Minneapolis at about $161,000, with a typical range of $140,000 to $187,000 (May 2026). The DNP itself adds little pay over an MSN.'},
+   roch:{start:125000,exp:140000,src:'BLS puts all NPs in Rochester at $119,980 (May 2025). Psych NPs usually earn above the NP average, so this is an estimate.'}}}};
+const CITY={tc:'Twin Cities',roch:'Rochester'};
+const TAX={fedStd:16100,fed65:2050,fed:[[12400,.10],[50400,.12],[105700,.22],[201775,.24],[256225,.32],[640600,.35],[1/0,.37]],
+  mnStd:15300,mn:[[33310,.0535],[109430,.068],[203150,.0785],[1/0,.0985]],ssBase:184500,mnSSLimit:82190};
+const TRICARE_SELECT=186.96,PART_B=202.90;
+const money0=n=>n.toLocaleString(undefined,{style:'currency',currency:'USD',maximumFractionDigits:0});
+function bracketTax(income,br){let tax=0,low=0;for(const[top,rate]of br){if(income<=low)break;tax+=(Math.min(income,top)-low)*rate;low=top;}return tax;}
+function planView(){S.planView=Object.assign({date:'2027-09-30',job:'rn',city:'tc',stage:'start'},S.planView||{});return S.planView;}
+function planResult(R){
+  const P=S.plan,V=planView(),O=P.options[V.date]||P.options[Object.keys(P.options)[0]];
+  const mult=Math.min(.75,.025*O.points/360),retGross=Math.round(O.high3*mult);
+  const va=Math.round(R.pay),crdp=R.rounded>=50,ret=crdp?retGross:Math.max(0,retGross-va);
+  const L=[],M=x=>Math.round(x/12);
+  L.push({side:'duty',k:'Army retired pay',v:ret,note:`${(mult*100).toFixed(2)}% of a ${money(O.high3)} High-3 average (${O.grade})${crdp?'':', reduced by your VA pay because the rating is under 50%'}`});
+  L.push({side:'duty',k:'VA disability',v:va,note:`${R.rounded}% from the calculator above, tax free`});
+  let fedInc=ret*12,mnInc=0,fica=0,health=0;
+  if(V.stage!=='retired'){
+    const J=JOBS[V.job].cities[V.city],sal=V.stage==='exp'?J.exp:J.start;
+    L.push({side:'study',k:`${JOBS[V.job].name}, ${CITY[V.city]}`,v:M(sal),note:`${money(sal)} a year, ${V.stage==='exp'?'experienced':'first year'}`});
+    fedInc+=sal;mnInc=sal;fica=Math.min(sal,TAX.ssBase)*.062+sal*.0145;health=TRICARE_SELECT;
+  }else{
+    L.push({side:'plain',k:'Social Security at 67',v:P.ss67,note:`Full retirement age is ${P.fra}`});
+    fedInc+=P.ss67*12*.85;health=PART_B*12;
+  }
+  const fed=bracketTax(Math.max(0,fedInc-TAX.fedStd-(V.stage==='retired'?TAX.fed65:0)),TAX.fed);
+  const mn=bracketTax(Math.max(0,mnInc-TAX.mnStd),TAX.mn);
+  const out=[{k:'Federal income tax',v:M(fed),note:'Single filer, standard deduction, 2026 brackets'},
+    {k:'Minnesota income tax',v:M(mn),note:V.stage==='retired'?'Minnesota does not tax military retired pay, and your Social Security stays under its income limit':'Minnesota does not tax military retired pay or VA pay, so only the salary is taxed'}];
+  if(fica)out.push({k:'Social Security and Medicare tax',v:M(fica),note:'7.65% of the salary'});
+  out.push(V.stage==='retired'?{k:'Medicare Part B',v:Math.round(PART_B),note:'Required to keep TRICARE For Life, which then costs nothing'}:{k:'TRICARE Select',v:Math.round(TRICARE_SELECT/12),note:`Retiree Group A, ${money(TRICARE_SELECT)} a year in 2026. Prime is $381.96.`});
+  out.push({k:'Survivor Benefit Plan',v:0,note:'Not needed while you are single. If you marry, you can elect it within the first year.'});
+  const inc=L.reduce((a,b)=>a+b.v,0),ded=out.reduce((a,b)=>a+b.v,0);
+  return{P,V,O,mult,retGross,ret,va,crdp,L,out,inc,ded,net:inc-ded};
+}
+function vPlan(R){
+  if(!S.plan)return `<div class="panel stack"><h3>Retirement income planner</h3><p class="small muted">Restore your Claim Kit backup (Backup & help) to load your retirement numbers.</p></div>`;
+  const X=planResult(R),V=X.V;
+  const seg=(key,opts)=>`<div class="seg" role="group">${opts.map(([v,n])=>`<button class="btn sm ${V[key]===v?'on':''}" data-pv="${key}" data-val="${v}" aria-pressed="${V[key]===v}">${n}</button>`).join('')}</div>`;
+  const line=r=>`<div class="pl-row ${r.side||''}"><div><b>${esc(r.k)}</b><div class="small muted">${esc(r.note)}</div></div><div class="amt">${money0(r.v)}</div></div>`;
+  const other=Object.keys(X.P.options).filter(d=>d!==V.date).map(d=>{const o=X.P.options[d];return{label:o.label,pay:Math.round(o.high3*Math.min(.75,.025*o.points/360))};})[0];
+  const J=JOBS[V.job].cities[V.city];
+  return `<div class="panel stack"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3>Retirement income planner</h3><span class="small muted">Monthly, in today's dollars</span></div>
+   <div class="stack" style="gap:8px">
+    <div><div class="eyebrow-s">Retire from AGR</div>${seg('date',Object.entries(X.P.options).map(([d,o])=>[d,o.label]))}</div>
+    <div><div class="eyebrow-s">Nursing job</div>${seg('job',[['rn','BSN RN'],['np','PMHNP, DNP']])}</div>
+    <div><div class="eyebrow-s">City</div>${seg('city',[['tc','Twin Cities'],['roch','Rochester']])}</div>
+    <div><div class="eyebrow-s">Stage</div>${seg('stage',[['start','First year working'],['exp','Experienced'],['retired','Fully retired, 67+']])}</div>
+   </div>
+   <div class="calc-head"><div><div class="eyebrow-s">Take-home a month</div><div class="big">${money0(X.net)}</div><div class="small muted">${money0(X.net*12)} a year after tax and health costs</div></div>
+    <div><div class="eyebrow-s">Income a month</div><div class="big" style="font-size:2rem">${money0(X.inc)}</div><div class="small muted">before tax</div></div></div>
+   <div class="pl-list"><div class="eyebrow-s">Income</div>${X.L.map(line).join('')}<div class="eyebrow-s" style="margin-top:10px">Taxes and costs</div>${X.out.map(line).join('')}</div>
+   <p class="small"><b>Retire date.</b> ${esc(X.O.note)}${other?` Retiring ${esc(other.label)} instead pays ${money0(other.pay)} a month.`:''}</p>
+   <p class="small"><b>Pay source.</b> ${esc(J.src)}${V.job==='np'?' PMHNP pay starts after the DNP, so plan on RN pay until you finish it.':''}</p>
+   ${X.crdp?'<p class="small"><b>Concurrent receipt.</b> At 50% or more you get full retired pay and full VA pay (CRDP). Under 50%, VA pay is taken out of retired pay unless Combat-Related Special Compensation applies, which is worth asking about for Iraq-related conditions.</p>':'<p class="small"><b>Concurrent receipt.</b> Under 50%, VA pay is taken out of retired pay, but the VA part is tax free. At 50% you would get both in full (CRDP). Combat-Related Special Compensation can also pay both for Iraq-related conditions.</p>'}
+   <details><summary class="small"><b>Other money to plan for</b></summary><ul class="small">${X.P.extras.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></details>
+   <p class="small muted">Estimates only. Retired pay assumes a 3.6% raise in January 2027 and the High-3 plan (your service began before 2018 and you had too many points to switch to BRS). Confirm your numbers with the state retirement services office and DFAS before you pick a date.</p></div>`;
+}
+function bindPlan(){document.querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{planView()[b.dataset.pv]=b.dataset.val;save();render();});}
 
 const VIEWS={calc:[vCalc,bindCalc],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup]};
 function render(){
