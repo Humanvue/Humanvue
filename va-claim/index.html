@@ -65,6 +65,8 @@ section.view>.stack{gap:16px}
 
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
 .banner{border-radius:var(--r);padding:12px 14px;background:var(--warn-bg);color:var(--ink);border:1px solid var(--warn);display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.filebar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:12px 0 0;padding:8px 12px;border-radius:10px;background:var(--surface-2)}
+.filebar.dirty{outline:1px solid var(--accent)}
 .chip{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;font-size:.75rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:999px;white-space:nowrap}
 .chip.duty{background:var(--duty-bg);color:var(--duty-ink)}
 .chip.study{background:var(--study-bg);color:var(--study-ink)}
@@ -206,17 +208,20 @@ details.panel>summary{cursor:pointer}
       <span class="chip study"><span class="dot study"></span>Off-duty / school side</span>
     </div>
   </header>
+  <div id="fileBar"></div>
   <nav class="tabs" role="tablist" id="tabs"></nav>
   <div id="exampleBanner"></div>
   <main id="main"></main>
 </div>
 <div id="toast" class="toast" hidden></div>
 
+<script id="ckdata" type="application/json">null</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
 <script>
 (function(){
 'use strict';
+const SRC0='<!doctype html>\n'+document.documentElement.outerHTML; // this page as loaded, used to write a copy that carries your data
 const KEY='claimkit.v1';
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -283,9 +288,35 @@ function exampleState(){
    tasks:{sepdate:true,tap:true,listconds:true},docEdits:{},docDone:{},claim:{}};
 }
 let S;
-function load(){try{const raw=localStorage.getItem(KEY);if(raw){S=Object.assign(blankState(),JSON.parse(raw));return;}}catch(e){}S=exampleState();}
+/* ---------- Keeping data: browser storage plus a copy saved inside this HTML file ---------- */
+function embedded(){try{const el=document.getElementById('ckdata');const o=el&&JSON.parse(el.textContent);return o&&Array.isArray(o.conditions)?o:null;}catch(e){return null;}}
+function load(){let loc=null;try{const raw=localStorage.getItem(KEY);if(raw)loc=JSON.parse(raw);}catch(e){}
+  const emb=embedded(),pick=loc&&emb?((loc.savedAt||0)>=(emb.savedAt||0)?loc:emb):loc||emb;
+  S=pick?Object.assign(blankState(),pick):exampleState();FILE.savedAt=emb?emb.savedAt||1:0;}
+const FILE={handle:null,savedAt:0,busy:false,timer:null};
+function fileCopy(){const json=JSON.stringify(S).replace(/</g,'\\u003c');
+  return SRC0.replace(/(<script id="ckdata" type="application\/json">)[\s\S]*?(<\/script>)/,(m,a,b)=>a+json+b);}
+function idb(){return new Promise((ok,no)=>{try{const r=indexedDB.open('claimkit-file',1);r.onupgradeneeded=()=>r.result.createObjectStore('h');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);}catch(e){no(e);}});}
+async function idbGet(){try{const db=await idb();return await new Promise(ok=>{const q=db.transaction('h').objectStore('h').get('file');q.onsuccess=()=>ok(q.result||null);q.onerror=()=>ok(null);});}catch(e){return null;}}
+async function idbPut(h){try{const db=await idb();db.transaction('h','readwrite').objectStore('h').put(h,'file');}catch(e){}}
+async function writeFile(){if(!FILE.handle||FILE.busy)return false;FILE.busy=true;
+  try{const w=await FILE.handle.createWritable();await w.write(fileCopy());await w.close();FILE.savedAt=S.savedAt;FILE.busy=false;renderFileBar();return true;}
+  catch(e){FILE.busy=false;FILE.handle=null;renderFileBar();return false;}}
+async function saveToFile(){ // Chrome and Edge can write straight into the file; Safari gets a fresh copy to replace the old one
+  S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+  if(window.showSaveFilePicker){
+    try{if(!FILE.handle){const old=await idbGet();if(old&&(await old.requestPermission({mode:'readwrite'}))==='granted')FILE.handle=old;}
+      if(!FILE.handle){FILE.handle=await showSaveFilePicker({suggestedName:'Claim Kit.html',types:[{description:'Claim Kit',accept:{'text/html':['.html']}}]});idbPut(FILE.handle);}
+      if(await writeFile()){toast('Saved into the file');return;}}
+    catch(e){if(e&&e.name==='AbortError')return;}}
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([fileCopy()],{type:'text/html'}));a.download='Claim Kit.html';document.body.appendChild(a);a.click();a.remove();
+  FILE.savedAt=S.savedAt;renderFileBar();toast('Saved a new copy to Downloads');}
+function renderFileBar(){const el=$('#fileBar');if(!el)return;const dirty=(S.savedAt||0)>(FILE.savedAt||0);
+  el.innerHTML=`<div class="filebar ${dirty?'dirty':''}"><span class="small">${FILE.handle?'<b>Auto-save is on.</b> Every change is written into this file.':dirty?'<b>You have changes not saved in the file yet.</b> They are kept in this browser too.':'<b>Your data is saved inside this file.</b>'}</span><button class="btn sm ${dirty&&!FILE.handle?'primary':''}" id="saveFile">${FILE.handle?'Save now':'Save to file'}</button></div>`;
+  $('#saveFile').onclick=saveToFile;}
 let saveTimer;
-function save(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}},200);}
+function save(nav){if(!nav)S.savedAt=Date.now();clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
+  if(FILE.handle){clearTimeout(FILE.timer);FILE.timer=setTimeout(writeFile,1200);}else renderFileBar();},200);}
 function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(t._h);t._h=setTimeout(()=>t.hidden=true,1800);}
 
 /* ---------- Dates ---------- */
@@ -319,11 +350,11 @@ function progress(){
 }
 
 /* ---------- Tabs ---------- */
-const TABS=[['dash','Dashboard'],['steps','Steps'],['me','About me'],['conds','Conditions'],['scan','Scan records'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['calc','Calculator'],['debt','Debt plan'],['backup','Backup & help']];
+const TABS=[['dash','Dashboard'],['steps','Steps'],['me','About me'],['conds','Conditions'],['scan','Scan records'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['calc','Calculator'],['debt','Debt plan'],['money','Money charts'],['backup','Backup & help']];
 function renderTabs(){
   $('#tabs').innerHTML=TABS.map(([id,n])=>`<button role="tab" id="tab-${id}" aria-selected="${S.tab===id}" data-tab="${id}">${n}</button>`).join('');
 }
-function go(tab){S.tab=tab;save();render();window.scrollTo({top:0});}
+function go(tab){S.tab=tab;save(true);render();window.scrollTo({top:0});}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b){go(b.dataset.tab);}});
 
 function renderBanner(){
@@ -685,7 +716,7 @@ function bindDocs(){
 
 function vBackup(){
   return `<div class="stack">
-  <div class="panel stack"><h2>Your data stays here</h2><p>Everything you type is saved only in this browser on this device. Nothing is uploaded, and this app never submits anything to VA. If you clear your browser data or switch phones, it is gone, so copy a backup now and then and keep it somewhere private (a note or file only you can open).</p>
+  <div class="panel stack"><h2>Your data stays here</h2><p>Nothing is uploaded, and this app never submits anything to VA. Everything you type is kept in this browser, and <b>Save to file</b> (at the top) writes it inside this HTML file, so opening the file brings it all back even if the browser forgets. In Chrome or Edge, pick this same file once and every change saves into it. In Safari, Save to file puts a new copy in Downloads; replace the old file with it. A copied backup is a second safety net.</p>
    <div class="row"><button class="btn primary" id="copyBackup">Copy backup</button><button class="btn" id="showImport">Restore from backup</button><span id="wipeWrap"><button class="btn danger" id="wipe">Erase everything</button></span></div>
    <div id="importBox" hidden class="stack"><label class="f">Paste a backup, or pick a backup file<textarea id="importText"></textarea></label><input type="file" id="importFile" accept=".json,.txt,application/json,text/plain"><div class="row"><button class="btn primary" id="doImport">Restore</button></div><p id="importMsg" class="small"></p></div>
    <textarea id="backupText" class="doc" style="min-height:80px" hidden readonly></textarea>
@@ -1075,7 +1106,7 @@ function simDebts(R,o,INC){ // o.strat: min | aval | snow | first ; o.first: id 
     return av;};
   let inv=0,cash=0,totInt=0,free=null,short=0;const rows=[];
   for(let t=0;t<INC.length;t++){
-    D.forEach(d=>{if(d.b>0){const i=d.b*d.apr/12;d.b+=i;d.int+=i;totInt+=i;}});
+    let intM=0;D.forEach(d=>{if(d.b>0){const i=d.b*d.apr/12;d.b+=i;d.int+=i;totInt+=i;intM+=i;}});
     const spare=INC[t]-base-totMin;let extra=spare>0?(o.extra==='all'?spare:o.extra==='half'?spare/2:0):0;
     let budget=o.strat==='min'?0:totMin+extra,paid=0;
     D.forEach(d=>{if(d.b>0){const p=Math.min(d.pay,d.b);d.b-=p;paid+=p;}});
@@ -1086,7 +1117,7 @@ function simDebts(R,o,INC){ // o.strat: min | aval | snow | first ; o.first: id 
     if(left<0){const c=D.find(d=>d.id===P.shortfallTo)||D[0];c.b+=-left;if(c.end!==null)c.end=null;short+=-left;left=0;}
     if(o.invest)inv=inv*(1+INVEST_RATE/12)+left;else cash+=left;
     const debt=D.reduce((a,d)=>a+d.b,0);if(free===null&&debt<=.5)free=start+t;
-    rows.push({i:start+t,bal:D.map(d=>d.b),debt,inv,cash,net:inv+cash-debt});
+    rows.push({i:start+t,bal:D.map(d=>d.b),debt,inv,cash,net:inv+cash-debt,paid,intM});
   }
   return{D,rows,totInt,free,short,start};
 }
@@ -1190,13 +1221,149 @@ function vDebt(){
    <details><summary class="small"><b>Table view of your debts</b></summary><div class="tbl-wrap"><table class="mtbl"><thead><tr><th>Debt</th><th>Owed now</th><th>Rate</th><th>Payment</th><th>Ends, minimums</th><th>Ends, this plan</th><th>Interest, this plan</th></tr></thead><tbody>${tbl}</tbody></table></div>
    <p class="small muted">${esc(P.debtNote||'')}</p></details></div></div>`;
 }
+/* ---------- Money charts: planning, debt, investing, property tax (personal numbers come from S.plan) ---------- */
+const chW=()=>Math.round(Math.max(300,Math.min(640,(document.querySelector('#main')?.clientWidth||660)-58)));
+const pct0=v=>`${Math.round(v*100)}%`;
+function lineChart(key,o){ // o.xs: month numbers; o.series: [{n,v,c,dash,fill}]; o.marks: [{i,lab}]
+  const w=chW(),nar=w<480,h=o.h||(nar?200:240),pad={t:14,r:12,b:26,l:o.yfmt?44:52},n=o.xs.length;
+  const all=o.series.flatMap(s=>s.v);let lo=Math.min(0,...all),hi=Math.max(...all,o.yfmt?.01:1);
+  const st=niceStep((hi-lo)/4||1);lo=Math.floor(lo/st+1e-9)*st;hi=Math.ceil(hi/st-1e-9)*st;if(hi<=lo)hi=lo+st;
+  const X=j=>pad.l+j/(n-1)*(w-pad.l-pad.r),Y=v=>h-pad.b-(v-lo)/(hi-lo)*(h-pad.t-pad.b),yf=o.yfmt||(v=>`${v<0?'−':''}${fmtK(Math.abs(v))}`);
+  let g='';for(let v=lo;v<=hi+st/2;v+=st)g+=`<line x1="${pad.l}" x2="${w-pad.r}" y1="${Y(v)}" y2="${Y(v)}" class="${Math.abs(v)<st/1e6?'zero':'grid'}"/><text x="${pad.l-6}" y="${Y(v)+4}" class="ax" text-anchor="end">${yf(v)}</text>`;
+  const yrs=o.xs.map((i,j)=>[i,j]).filter(([i])=>i%12===0),every=Math.max(1,Math.ceil(yrs.length/(nar?5:9)));
+  yrs.forEach(([i,j],k)=>{if(k%every===0)g+=`<text x="${X(j)}" y="${h-pad.b+16}" class="ax" text-anchor="middle">${o.xlab?o.xlab(i):i/12}</text><line x1="${X(j)}" x2="${X(j)}" y1="${h-pad.b}" y2="${h-pad.b+4}" class="axl"/>`;});
+  (o.marks||[]).forEach((m,k)=>{const j=o.xs.indexOf(m.i);if(j<0)return;g+=`<line x1="${X(j)}" x2="${X(j)}" y1="${pad.t}" y2="${h-pad.b}" class="evl ${m.side||''}"/><text x="${Math.min(X(j)+4,w-pad.r-4)}" y="${pad.t+10+(k%2)*13}" class="ax" text-anchor="${X(j)>w*.7?'end':'start'}">${esc(m.lab)}</text>`;});
+  const pts=s=>s.v.map((v,j)=>`${X(j).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  o.series.forEach(s=>{if(s.fill)g+=`<polygon points="${X(0)},${Y(Math.max(lo,0))} ${pts(s)} ${X(n-1)},${Y(Math.max(lo,0))}" style="fill:${s.c};opacity:.16"/>`;});
+  o.series.forEach(s=>{g+=`<polyline points="${pts(s)}" class="ln" style="stroke:${s.c}${s.dash?';stroke-dasharray:5 4':''}"/>`;});
+  CHARTS[key]={pad,w,fmt:o.tipfmt||(o.yfmt?pct0:null),rows:o.xs.map((i,j)=>({lab:o.tiplab?o.tiplab(i):ym(i),vals:o.series.map(s=>[s.n,s.v[j],s.c])}))};
+  const leg=o.series.map(s=>`<span class="lg"><i style="background:${s.c}${s.dash?';opacity:.6':''}"></i>${esc(s.n)}</span>`).join('');
+  return `<div class="chart-wrap" data-chart="${key}"><svg viewBox="0 0 ${w} ${h}" class="viz" role="img" aria-label="${esc(o.aria||'')}">${g}<line class="xh" x1="0" x2="0" y1="${pad.t}" y2="${h-pad.b}" style="display:none"/><rect class="hit" x="${pad.l}" y="${pad.t}" width="${w-pad.l-pad.r}" height="${h-pad.t-pad.b}"/></svg><div class="tip" hidden></div></div><div class="legend">${leg}</div>`;
+}
+function hbars(items,o){ // items: [{lab,v,c,tip,txt}]
+  o=o||{};const w=chW(),nar=w<480,lw=nar?2:(o.lw||170),rw=nar?118:130,rh=nar?42:28,h=items.length*rh+8,mx=Math.max(1,...items.map(x=>Math.abs(x.v)));let g='';
+  items.forEach((x,k)=>{const y=4+k*rh,by=nar?y+18:y+6,wd=Math.max(2,(w-lw-rw)*Math.abs(x.v)/mx); // on a phone the label sits above its bar
+    g+=nar?`<text x="0" y="${y+12}" class="lab">${esc(x.lab)}</text>`:`<text x="${lw-8}" y="${y+18}" class="lab" text-anchor="end">${esc(x.lab)}</text>`;
+    g+=`<rect x="${lw}" y="${by}" width="${wd}" height="15" rx="4" style="fill:${x.c||'var(--s1)'}" ${x.tip?`data-tip="${esc(x.tip)}"`:''}/><text x="${lw+wd+6}" y="${by+12}" class="lab">${esc(x.txt??money0(x.v))}</text>`;});
+  return `<div class="chart-wrap"><svg viewBox="0 0 ${w} ${h}" class="viz" role="img" aria-label="${esc(o.aria||'')}">${g}${nar?'':`<line x1="${lw}" x2="${lw}" y1="2" y2="${h-2}" class="zero"/>`}</svg><div class="tip" hidden></div></div>`;
+}
+function vbars(groups,o){ // groups: [{lab,segs:[[name,v,c]]}]; o.grouped puts segments side by side instead of stacked
+  o=o||{};const w=chW(),nar=w<480,h=o.h||(nar?200:230),pad={t:12,r:8,b:26,l:48},n=groups.length;
+  const tops=groups.map(gr=>o.grouped?Math.max(0,...gr.segs.map(s=>s[1])):gr.segs.reduce((a,s)=>a+Math.max(0,s[1]),0)),st=niceStep(Math.max(1,...tops)/4),hi=Math.ceil(Math.max(1,...tops)/st)*st;
+  const Y=v=>h-pad.b-v/hi*(h-pad.t-pad.b),bw=(w-pad.l-pad.r)/n;let g='';
+  for(let v=0;v<=hi+st/2;v+=st)g+=`<line x1="${pad.l}" x2="${w-pad.r}" y1="${Y(v)}" y2="${Y(v)}" class="${v?'grid':'zero'}"/><text x="${pad.l-6}" y="${Y(v)+4}" class="ax" text-anchor="end">${fmtK(v)}</text>`;
+  const every=Math.max(1,Math.ceil(n/(nar?6:12)));
+  groups.forEach((gr,k)=>{const x0=pad.l+k*bw+bw*.14,inner=bw*.72;let acc=0;
+    gr.segs.forEach((s,q)=>{const v=Math.max(0,s[1]),tip=`${gr.lab}, ${s[0]}: ${money0(s[1])}`;
+      if(o.grouped){const sw=inner/gr.segs.length;g+=`<rect x="${x0+q*sw}" y="${Y(v)}" width="${Math.max(1,sw-1)}" height="${Y(0)-Y(v)}" rx="2" style="fill:${s[2]}" data-tip="${esc(tip)}"/>`;}
+      else{g+=`<rect x="${x0}" y="${Y(acc+v)}" width="${inner}" height="${Y(acc)-Y(acc+v)}" style="fill:${s[2]}" data-tip="${esc(tip)}"/>`;acc+=v;}});
+    if(k%every===0)g+=`<text x="${x0+inner/2}" y="${h-pad.b+16}" class="ax" text-anchor="middle">${esc(gr.lab)}</text>`;});
+  const leg=(o.legend||groups[0].segs.map(s=>[s[0],s[2]])).map(([nm,c])=>`<span class="lg"><i style="background:${c}"></i>${esc(nm)}</span>`).join('');
+  return `<div class="chart-wrap"><svg viewBox="0 0 ${w} ${h}" class="viz" role="img" aria-label="${esc(o.aria||'')}">${g}</svg><div class="tip" hidden></div></div><div class="legend">${leg}</div>`;
+}
+function mortgage(H,from,months,extra){ // balance each month from `from`, starting at the known balance on H.balAt
+  let b=H.bal,i=ymIdx(H.balAt);const r=H.rate/12;while(i<from&&b>0){b=b+b*r-H.pi;i++;}
+  const out=[];let int=0,end=null;for(let t=0;t<months;t++){if(b>0){const it=b*r;int+=it;b=Math.max(0,b+it-H.pi-(extra||0));if(b===0&&end===null)end=from+t;}out.push(b);}
+  if(end===null){let bb=b,k=from+months;while(bb>0&&k<from+600){const it=bb*r;int+=it;bb=Math.max(0,bb+it-H.pi-(extra||0));k++;}end=k;}
+  return{bal:out,int,end};}
+const homeVal=(H,i)=>H.value*Math.pow(1+H.grow,(i-ymIdx(H.valueAt))/12);
+function homeTax(H,V,mode){ // Minnesota homestead: 1% class rate up to $500k; the disabled veteran exclusion replaces the regular homestead exclusion
+  const ex=mode==='70'?Math.min(V,H.dv70):mode==='100'?Math.min(V,H.dv100):V<=95000?.4*V:Math.max(0,38000-.09*(V-95000));
+  const T=V-ex,cap=Math.min(T,500000)*.01+Math.max(0,T-500000)*.0125;return{tax:cap*H.localRate,excl:ex,taxable:T};}
+function fv(m,r,yrs){const k=r/12,n=yrs*12;return k?m*((Math.pow(1+k,n)-1)/k):m*n;}
+function vMoney(){
+  const R=calcResult(),P=S.plan;
+  if(!P||!P.debts||!P.budget)return `<div class="panel stack"><h3>Money charts</h3><p class="small muted">Restore your Claim Kit backup (Backup & help) to load your numbers.</p></div>`;
+  const V=planView();V.msec=V.msec||'plan';V.dstrat=V.dstrat||'aval';V.dextra=V.dextra||'half';V.imon=V.imon||'500';V.mextra=V.mextra||'0';
+  const INC=debtIncome(R),plan=simDebts(R,{strat:V.dstrat,extra:V.dextra},INC),mins=simDebts(R,{strat:'min',extra:'none'},INC);
+  const start=plan.start,rm=ymIdx(V.date.slice(0,7)),nowI=start,H=P.home,c=k=>`var(--s${k})`;
+  const tile=(lab,big,sub)=>`<div class="tile"><div class="eyebrow-s">${lab}</div><div class="tbig">${big}</div><div class="small muted">${sub}</div></div>`;
+  const card=(t,body,note)=>`<div class="panel stack"><div class="eyebrow-s">${t}</div>${body}${note?`<p class="small">${note}</p>`:''}</div>`;
+  const marks=[{i:rm+1,lab:'Retire AGR',side:'duty'}];if(plan.free!==null)marks.push({i:plan.free,lab:'Debt free'});
+  const age=i=>Math.floor((i-ymIdx(P.born))/12);
+  let out='';
+  if(V.msec==='plan'){
+    const off=offSet(),B=P.budget,items=B.groups.map((g,k)=>({lab:g.k,v:off[g.k]?0:g.v,c:off[g.k]?'var(--line)':g.debt?'var(--s3)':c(1),txt:off[g.k]?'off':money0(g.v),tip:g.note||g.k})).sort((a,b)=>b.v-a.v);
+    const spendNow=B.groups.reduce((a,g)=>a+(off[g.k]?0:g.v),0);
+    out+=`<div class="tiles">${tile('Take-home now',money0(B.nowIncome),'a month on AGR')}${tile('Spending now',money0(spendNow),'with your expense switches')}${tile('Left over',sgn(B.nowIncome-spendNow),'a month, before retiring')}</div>`;
+    out+=card('Where your money goes each month',hbars(items,{aria:'Monthly spending by group'}),`Debt payments are ${pct0((B.groups.find(g=>g.debt)||{v:0}).v/Math.max(1,spendNow))} of what you spend. Turn expenses on or off on the Calculator or Debt plan tab and every chart here follows.`);
+    const N=Math.min(INC.length,8*12),xs=Array.from({length:N},(_,t)=>start+t),base=nonDebtSpend();
+    out+=card('Money in and money out, month by month',lineChart('cash',{xs,aria:'Take-home and spending each month',marks,series:[{n:'Take-home',v:INC.slice(0,N),c:c(1),fill:true},{n:'Living costs plus debt payments',v:plan.rows.slice(0,N).map(r=>base+r.paid),c:c(2)}]}),
+      `When the blue line is above the other one you have money left over. Retirement changes your take-home, and each debt you finish drops the second line.`);
+    const inv=simDebts(R,{strat:V.dstrat,extra:V.dextra,invest:true},INC),invM=simDebts(R,{strat:'min',extra:'none',invest:true},INC),NN=INC.length,xs2=Array.from({length:NN},(_,t)=>start+t);
+    const eq=H?xs2.map((i,t)=>homeVal(H,i)-mortgage(H,start,NN).bal[t]):null;
+    const ser=[{n:'Net worth',v:inv.rows.map((r,t)=>r.net+(eq?eq[t]:0)),c:c(1),fill:true},{n:'Investments',v:inv.rows.map(r=>r.inv),c:c(4)},{n:'Debts you still owe',v:inv.rows.map(r=>r.debt),c:c(3)}];
+    if(eq)ser.push({n:'Home equity',v:eq,c:c(5),dash:true});
+    out+=card('Your net worth path',lineChart('nwp',{xs:xs2,aria:'Net worth over time',marks,series:ser}),`Net worth is what you own (investments${H?' and home equity':''}) minus what you owe. This follows your Debt plan settings: debts first, then money left over each month is invested at ${Math.round(INVEST_RATE*100)}% a year.${H?' Home value grows '+Math.round(H.grow*100)+'% a year (an estimate).':''}`);
+    const stages=[['AGR',null],['RN yr 1',{job:'rn',stage:'start'}],['RN later',{job:'rn',stage:'exp'}]];if(V.job==='np')stages.push(['NP',{job:'np',stage:'exp'}]);stages.push([`At ${V.ss}`,{stage:'retired'}]);
+    const groups=stages.map(([lab,o])=>{if(!o)return{lab,segs:[['Take-home',B.nowIncome,c(1)],['Retired pay',0,'var(--duty)'],['VA pay',0,c(4)],['Pay or Social Security',0,'var(--study)']]};
+      const r=planResult(R,o),ln=r.L;return{lab,segs:[['Take-home',0,c(1)],['Retired pay',ln[0].v,'var(--duty)'],['VA pay',ln[1].v,c(4)],['Pay or Social Security',ln[2]?ln[2].v:0,'var(--study)']]};});
+    out+=card('Where your income comes from at each stage',vbars(groups,{aria:'Monthly income by source at each stage'}),'Before taxes, except the AGR bar, which is take-home. Retired pay is olive (duty side) and nursing pay is blue (school side). VA pay is tax free.');
+  }
+  if(V.msec==='debt'){
+    const live=P.debts.filter(d=>d.bal>0);
+    const perDay=live.map((d,k)=>({lab:d.short||d.name,v:d.bal*d.apr/365,c:c(P.debts.indexOf(d)+1),txt:`$${(d.bal*d.apr/365).toFixed(2)} a day`,tip:`${d.name}: ${money0(d.bal*d.apr/12)} a month in interest at ${(d.apr*100).toFixed(2)}%`})).sort((a,b)=>b.v-a.v);
+    const day=perDay.reduce((a,x)=>a+x.v,0);
+    out+=`<div class="tiles">${tile('Interest a day',`$${day.toFixed(2)}`,'across all your debts now')}${tile('Interest a year',money0(day*365),'if balances stayed the same')}${tile('Debt free',plan.free!==null?ym(plan.free):'later','with the Debt plan settings')}</div>`;
+    out+=card('What each debt costs you every day',hbars(perDay,{aria:'Daily interest by debt'}),'This is the interest added each day at today\'s balance. The longest bar is the most expensive debt to keep. Paying it down first stops the biggest leak.');
+    const yrs={};plan.rows.forEach(r=>{const y=Math.floor(r.i/12);const Y=yrs[y]=yrs[y]||{int:0,prin:0};Y.int+=r.intM;Y.prin+=Math.max(0,r.paid-r.intM);});
+    const yk=Object.keys(yrs).map(Number).filter(y=>yrs[y].int+yrs[y].prin>1);
+    out+=card('Each year: interest versus paying down what you owe',vbars(yk.map(y=>({lab:String(y),segs:[['Interest',yrs[y].int,c(3)],['Principal (what you owe)',yrs[y].prin,c(1)]]})),{aria:'Interest and principal paid each year'}),`Interest is money gone. Principal shrinks what you owe. Early on, more of each payment is interest; as balances fall the blue part grows. Total interest with this plan: ${money0(plan.totInt)}.`);
+    const N=Math.min(INC.length,10*12),xs=Array.from({length:N},(_,t)=>start+t),hous=(P.budget.groups.find(g=>/hous/i.test(g.k))||{v:0}).v;
+    out+=card('Share of take-home going to debt',lineChart('dti',{xs,marks,yfmt:pct0,aria:'Debt payments as a share of take-home',series:[{n:'Debt payments',v:plan.rows.slice(0,N).map((r,t)=>r.paid/INC[t]),c:c(3),fill:true},{n:'Debt payments plus mortgage',v:plan.rows.slice(0,N).map((r,t)=>(r.paid+hous)/INC[t]),c:c(2)}]}),
+      'Lenders like total debt payments under about 36% of gross income, which is roughly 45% of take-home. Getting under that line makes refinancing the Rivian or the house easier.');
+    if(H){const M=420,ex=[0,100,250,500].map(e=>({e,m:mortgage(H,start,M,e)}));const sel=ex.find(x=>x.e===+V.mextra)||ex[0];
+      const xs3=Array.from({length:Math.min(M,ex[0].m.end-start+13)},(_,t)=>start+t).filter(i=>i%3===0);
+      out+=card('Your mortgage',`<div><div class="eyebrow-s">Extra each month</div>${segBtns(V,'mextra',[['0','None'],['100','$100'],['250','$250'],['500','$500']])}</div>
+       ${lineChart('mort',{xs:xs3,aria:'Mortgage balance with extra payments',series:ex.map((x,k)=>({n:x.e?`+${money0(x.e)} a month`:'Regular payment',v:xs3.map(i=>x.m.bal[i-start]),c:c(k+1),dash:x.e!==sel.e&&x.e!==0}))})}
+       <div class="tiles">${tile('Paid off',ym(sel.m.end),sel.e?`${Math.round((ex[0].m.end-sel.m.end)/12*10)/10} years sooner`:'on the regular schedule')}${tile('Interest left',money0(sel.m.int),sel.e?`${money0(ex[0].m.int-sel.m.int)} less`:'from now to payoff')}${tile('Owed now',money0(mortgage(H,start,1).bal[0]),'estimate')}</div>`,
+       `${esc(H.mortNote||'')} At ${(H.rate*100).toFixed(2)}% the mortgage is your cheapest debt, so extra money does more on the cards first.`);}
+  }
+  if(V.msec==='invest'){
+    const m=+V.imon,yrsN=30,y0=Math.floor(nowI/12),xs=Array.from({length:yrsN+1},(_,k)=>(y0+k)*12);
+    out+=`<div><div class="eyebrow-s">Invest each month</div>${segBtns(V,'imon',[['250','$250'],['500','$500'],['1000','$1,000'],['2000','$2,000']])}</div>`;
+    out+=`<div class="tiles">${tile('In 10 years',money0(fv(m,.07,10)),`${money0(m*120)} of it is what you put in`)}${tile('In 20 years',money0(fv(m,.07,20)),`${money0(m*240)} put in`)}${tile('In 30 years',money0(fv(m,.07,30)),`you would be ${age((y0+30)*12)}`)}</div>`;
+    out+=card(`What ${money0(m)} a month grows to`,lineChart('grow',{xs,tiplab:i=>`${i/12} (age ${age(i)})`,aria:'Growth of a monthly investment at different returns',series:[{n:'10% a year (good years)',v:xs.map((i,k)=>fv(m,.10,k)),c:c(4)},{n:'7% a year (long-run average)',v:xs.map((i,k)=>fv(m,.07,k)),c:c(1),fill:true},{n:'4% a year (cautious)',v:xs.map((i,k)=>fv(m,.04,k)),c:c(5)},{n:'What you put in',v:xs.map((i,k)=>m*12*k),c:'var(--ink-3)',dash:true}]}),
+      'The gap between the dashed line and the others is growth on growth (compounding). It is small at first and huge later, which is why the early years count most. Returns are not guaranteed and markets drop some years.');
+    const at=ymIdx(`${+P.born.slice(0,4)+67}-${P.born.slice(5,7)}`),later=[0,1,3,5].map(d=>({lab:d?`Wait ${d} year${d>1?'s':''}`:'Start now',v:fv(m,.07,Math.max(0,(at-nowI)/12-d))}));
+    out+=card('The cost of waiting to start',hbars(later.map((x,k)=>({...x,c:c(k?3:1),tip:`${x.lab}: about ${money0(x.v)} at age 67`})),{aria:'Value at 67 by start date'}),`Value at age 67 if you invest ${money0(m)} a month at 7%. Waiting 5 years costs about ${money0(later[0].v-later[3].v)}.`);
+    const where=P.debts.filter(d=>d.bal>0&&d.apr>0).map(d=>({lab:`Pay off ${d.short||d.name}`,v:d.apr,txt:`${(d.apr*100).toFixed(1)}% sure`,c:c(3),tip:`Every dollar on ${d.name} saves ${(d.apr*100).toFixed(1)}% a year, guaranteed`}));
+    if(H)where.push({lab:'Extra on the mortgage',v:H.rate,txt:`${(H.rate*100).toFixed(1)}% sure`,c:c(3)});
+    where.push({lab:'Stock index fund',v:.07,txt:'about 7%, not sure',c:c(1),tip:'Long-run average; some years lose money'},{lab:'High-yield savings',v:.04,txt:'about 4%, safe',c:c(5),tip:'Good for the emergency fund'});
+    out+=card('Where your next dollar earns the most',hbars(where.sort((a,b)=>b.v-a.v),{aria:'Return from each place you could put a dollar'}),'Paying off a debt earns its interest rate with no risk. Anything above the 7% bar beats investing on average, so cards and loans above it come first. Below it, investing usually wins. Keep about 3 months of spending in savings first, and always take any employer 401(k) or 403(b) match.');
+    const dbl=[.04,.07,.10].map(r=>({lab:`${Math.round(r*100)}% a year`,v:Math.log(2)/Math.log(1+r),txt:`${(Math.log(2)/Math.log(1+r)).toFixed(1)} years`,c:c(r===.07?1:r===.04?5:4)}));
+    out+=card('How long money takes to double',hbars(dbl,{aria:'Years to double at each return'}),'At 7% a dollar doubles about every 10 years. A card at 24% doubles what you owe in about 3 years if you only let it grow.');
+  }
+  if(V.msec==='home'){
+    if(!H)return `<div class="stack">${moneyHead(V)}<div class="panel"><p class="small muted">Restore your backup to load your home numbers.</p></div></div>`;
+    const pays=[];for(let y=+H.firstYear;y<=+H.firstYear+10;y++)pays.push(y);
+    const tx=y=>{const v=homeVal(H,ymIdx(`${y-1}-01`));return{v,reg:homeTax(H,v,'reg'),d70:homeTax(H,v,'70'),d100:homeTax(H,v,'100')};};
+    const ty=+(new Date().getFullYear())+1,T=tx(ty),save70=T.reg.tax-T.d70.tax,save100=T.reg.tax-T.d100.tax;
+    out+=`<div class="tiles">${tile(`Property tax ${ty}`,money0(T.reg.tax),'estimate, regular homestead')}${tile('At a 70% VA rating',`−${money0(save70)}`,`a year (${pct0(save70/T.reg.tax)} less)`)}${tile('At 100% P&amp;T',`−${money0(save100)}`,'a year')}</div>`;
+    out+=`<p class="small ${R.rounded>=70?'':'warnbox'}">${R.rounded>=70?`Your estimated ${R.rounded}% rating qualifies for the $${H.dv70/1000}k exclusion. Apply with the ${esc(H.county)} County assessor as soon as the rating letter arrives.`:`Your estimate is ${R.rounded}% today. Reaching 70% combined (for example, mental health at 50%) unlocks the $${H.dv70/1000}k exclusion, worth about ${money0(save70)} a year on this house, on top of the higher VA pay.`}</p>`;
+    const hist=(H.history||[]).map(x=>({lab:String(x.y),segs:[['Actual (from your 1098)',x.tax,'var(--ink-3)'],['',0,'transparent'],['',0,'transparent']]}));
+    out+=card('Property tax by year',vbars(hist.concat(pays.filter(y=>!(H.history||[]).some(x=>x.y===y)).map(y=>{const t=tx(y);return{lab:String(y),segs:[['Regular homestead',t.reg.tax,c(2)],['With 70% rating',t.d70.tax,c(1)],['With 100% P&T',t.d100.tax,c(4)]]};})),{grouped:true,aria:'Property tax each year under three ratings',legend:[['Actual (from your 1098)','var(--ink-3)'],['Regular homestead',c(2)],['With 70% rating',c(1)],['With 100% P&T',c(4)]]}),
+      `Grey bars are what your escrow paid. Later years are estimates: home value grows ${Math.round(H.grow*100)}% a year and local rates stay where your ${H.history&&H.history.length?H.history[H.history.length-1].y:''} bill puts them. Your bill rose about ${H.history&&H.history.length>1?pct0(Math.pow(H.history[H.history.length-1].tax/H.history[0].tax,1/(H.history[H.history.length-1].y-H.history[0].y))-1):'—'} a year.`);
+    const sh=[['reg','Regular'],['70','70% rating'],['100','100% P&T']].map(([k,l],q)=>{const t=homeTax(H,T.v,k);return{lab:l,v:t.taxable,c:c(q?q===1?1:4:2),txt:`${money0(t.taxable)} taxed`,tip:`${l}: ${money0(t.excl)} of ${money0(T.v)} is left out of the tax`};});
+    out+=card(`How much of your ${money0(T.v)} home gets taxed`,hbars(sh,{aria:'Taxable value under each rating'}),`The regular homestead exclusion only takes off ${money0(homeTax(H,T.v,'reg').excl)} on a home this size. The veteran exclusion replaces it and takes off $${H.dv70/1000}k at 70% or $${H.dv100/1000}k at 100% permanent and total.`);
+    let a70=0,a100=0;const cum=pays.map(y=>{const t=tx(y);a70+=t.reg.tax-t.d70.tax;a100+=t.reg.tax-t.d100.tax;return[a70,a100];});
+    out+=card('Savings add up',lineChart('ptx',{xs:pays.map(y=>y*12),tiplab:i=>String(i/12),aria:'Total property tax saved over time',series:[{n:'Saved with 70% rating',v:cum.map(x=>x[0]),c:c(1),fill:true},{n:'Saved with 100% P&T',v:cum.map(x=>x[1]),c:c(4)}]}),`Over ${pays.length} years the 70% exclusion saves about ${money0(a70)} on this house.`);
+    const M=300,mb=mortgage(H,start,M),xs=Array.from({length:M},(_,t)=>start+t).filter(i=>i%3===0);
+    out+=card('Home value versus what you owe on it',lineChart('heq',{xs,aria:'Home value and mortgage balance',series:[{n:'Home value (estimate)',v:xs.map(i=>homeVal(H,i)),c:c(5)},{n:'Mortgage balance',v:xs.map(i=>mb.bal[i-start]),c:c(3),fill:true}]}),`The space between the lines is your equity, about ${money0(homeVal(H,start)-mb.bal[0])} now. ${esc(H.valueNote||'')}`);
+    out+=`<div class="panel stack"><div class="eyebrow-s">Other property tax help</div><ul class="small">${(H.tips||[]).map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`;
+  }
+  return `<div class="stack">${moneyHead(V)}${out}</div>`;
+}
+function moneyHead(V){const P=S.plan;return `<div class="panel stack"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3>Money charts</h3><span class="small muted">Uses the same switches as the Calculator and Debt plan</span></div>
+  ${segBtns(V,'msec',[['plan','Planning'],['debt','Debt'],['invest','Investing'],['home','Property tax']])}
+  <div class="row" style="gap:8px;flex-wrap:wrap"><div><div class="eyebrow-s">Retire from AGR</div>${segBtns(V,'date',Object.entries(P.options).map(([d,o])=>[d,o.label]))}</div><div><div class="eyebrow-s">Nursing job</div>${segBtns(V,'job',[['rn','BSN RN'],['np','PMHNP']])}</div></div></div>`;}
 function bindDebt(){bindPlan();bindCharts();}
 function bindCharts(){
   document.querySelectorAll('.chart-wrap').forEach(wr=>{const tip=wr.querySelector('.tip'),svg=wr.querySelector('svg'),C=CHARTS[wr.dataset.chart];
     if(C){const hit=svg.querySelector('.hit'),xh=svg.querySelector('.xh');
       const show=ev=>{const r=svg.getBoundingClientRect(),sx=(ev.clientX-r.left)/r.width*C.w;const j=Math.max(0,Math.min(C.rows.length-1,Math.round((sx-C.pad.l)/(C.w-C.pad.l-C.pad.r)*(C.rows.length-1))));
         const x=C.pad.l+j/(C.rows.length-1)*(C.w-C.pad.l-C.pad.r);xh.setAttribute('x1',x);xh.setAttribute('x2',x);xh.style.display='';const row=C.rows[j];
-        tip.innerHTML=`<b>${row.lab}</b>${row.vals.map(v=>`<div class="tr"><i style="background:${v[2]}"></i><span>${esc(v[0])}</span><b>${sgn(v[1])}</b></div>`).join('')}${row.tot!=null?`<div class="tr"><i></i><span>Total</span><b>${money0(row.tot)}</b></div>`:''}`;
+        tip.innerHTML=`<b>${row.lab}</b>${row.vals.map(v=>`<div class="tr"><i style="background:${v[2]}"></i><span>${esc(v[0])}</span><b>${C.fmt?C.fmt(v[1]):sgn(v[1])}</b></div>`).join('')}${row.tot!=null?`<div class="tr"><i></i><span>Total</span><b>${money0(row.tot)}</b></div>`:''}`;
         tip.hidden=false;const px=x/C.w*r.width;tip.style.left=Math.min(Math.max(0,px+12),r.width-tip.offsetWidth)+'px';tip.style.top='8px';};
       hit.addEventListener('pointermove',show);hit.addEventListener('pointerdown',show);hit.addEventListener('pointerleave',()=>{tip.hidden=true;xh.style.display='none';});}
     svg.querySelectorAll('[data-tip]').forEach(m=>{const sh=ev=>{const r=wr.getBoundingClientRect();tip.textContent=m.dataset.tip;tip.hidden=false;tip.style.left=Math.min(Math.max(0,ev.clientX-r.left+10),r.width-tip.offsetWidth)+'px';tip.style.top=Math.max(0,ev.clientY-r.top-40)+'px';};
@@ -1205,10 +1372,10 @@ function bindCharts(){
 function bindPlan(){document.querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{planView()[b.dataset.pv]=b.dataset.val;save();render();});
   document.querySelectorAll('[data-poff]').forEach(c=>c.onchange=()=>{const o=offSet();if(c.checked)delete o[c.dataset.poff];else o[c.dataset.poff]=true;save();render();});}
 
-const VIEWS={calc:[vCalc,bindCalc],debt:[vDebt,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup]};
+const VIEWS={calc:[vCalc,bindCalc],debt:[vDebt,bindDebt],money:[vMoney,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup]};
 function render(){
   if(!VIEWS[S.tab])S.tab='dash';
-  renderTabs();renderBanner();
+  renderTabs();renderBanner();renderFileBar();
   const [v,b]=VIEWS[S.tab];
   try{$('#main').innerHTML=`<section class="view" role="tabpanel" aria-labelledby="tab-${S.tab}">${v()}</section>`;b();}
   catch(e){console.error(e);const bad=S.tab;
