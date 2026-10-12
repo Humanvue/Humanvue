@@ -65,6 +65,8 @@ section.view>.stack{gap:16px}
 
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
 .banner{border-radius:var(--r);padding:12px 14px;background:var(--warn-bg);color:var(--ink);border:1px solid var(--warn);display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.viz .asofl{stroke:var(--accent);stroke-width:2}.viz .evl.asof{stroke:var(--accent);stroke-dasharray:none;stroke-width:2}
+.asof input[type=range]{width:100%;accent-color:var(--accent)}
 .filebar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:12px 0 0;padding:8px 12px;border-radius:10px;background:var(--surface-2)}
 .filebar.dirty{outline:1px solid var(--accent)}
 .chip{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;font-size:.75rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:999px;white-space:nowrap}
@@ -937,14 +939,22 @@ const JOBS={
    tc:{start:140000,exp:161000,src:'PayScale puts psychiatric NPs in Minneapolis at about $161,000, with a typical range of $140,000 to $187,000 (May 2026). The DNP itself adds little pay over an MSN.'},
    roch:{start:125000,exp:140000,src:'BLS puts all NPs in Rochester at $119,980 (May 2025). Psych NPs usually earn above the NP average, so this is an estimate.'}}}};
 const CITY={tc:'Twin Cities',roch:'Rochester'};
-const VA_PAY={ // Minneapolis VA Health Care System, which also runs the Rochester VA clinic. Title 38 nurse pay, 2026.
-  rn:{start:90469,exp:107000,src:'VA year 1 is the lowest rate on a 2026 Minneapolis VA RN posting ($90,469 to $154,749 across Nurse I to III). Experienced is the median of 1,162 Minneapolis VA RN salaries on Glassdoor (Oct 2026).'},
-  np:{start:140000,exp:160000,src:'VA psychiatric NPs are usually Nurse III or IV. This is an estimate: the top of the Minneapolis VA RN range is $154,749, and NP roles sit at or above it.'},
-  grades:[['Nurse I','New BSN grad','$90,500 to start'],['Nurse II','BSN with 1 to 2 years, or an MSN','$100k to $120k'],['Nurse III','MSN or DNP, charge or specialty roles','up to $154,749'],['Nurse practitioner','PMHNP, usually Nurse III or IV','$140k to $175k (estimate)']],
-  fers:.044,match:.05,general:[[2025,.02],[2026,.01],[2027,0]],stepAvg:.015,hospRaise:.03};
-function payPath(job,emp,years){ // yearly pay: rises from first-year to experienced over 3 years, then by typical raises
-  const J=emp==='va'?VA_PAY[job]:JOBS[job].cities[planView().city],g=emp==='va'?.02:VA_PAY.hospRaise;
-  return Array.from({length:years},(_,k)=>k<3?J.start+(J.exp-J.start)*k/3:J.exp*Math.pow(1+g,k-3));}
+const VA_PAY={ // Minneapolis VA (station 618) Nurse Locality Pay Schedule NG02 and NG04, effective 11 Jan 2026: [step 1, raise per step], 12 steps
+  rn:{table:[[90469,2714],[106752,3202],[116359,3490]],names:['Nurse I','Nurse II','Nurse III'],promo:[[2,1]],src:'Minneapolis VA Nurse Locality Pay Schedule (Registered Nurse, NG02), effective 11 Jan 2026. It covers the Twin Cities metro, including Hastings. This path assumes you start as Nurse I step 1 and move to Nurse II after 2 years.'},
+  np:{table:[[111359,3340],[131400,3942],[143226,4296]],names:['APRN grade I','APRN grade II','APRN grade III'],g0:1,promo:[[3,2]],src:'Minneapolis VA Nurse Locality Pay Schedule (Advanced Practice RN, NG04), effective 11 Jan 2026. This path assumes a new PMHNP with a DNP starts at APRN grade II step 1 and moves to grade III after 3 years.'},
+  stepsAt:[1,2,3,5,7,9,12,15,18,21,24], // years in grade when each step raise comes (assumed: yearly at first, then every 2, then every 3)
+  general:{2026:.01,2027:0},later:.02,fers:.044,match:.05,hospRaise:.03};
+function vaPayAt(job,yrs,calYear){ // VA pay after `yrs` years in the job, with yearly federal raises up to calYear
+  const T=VA_PAY[job],rate=(g,st)=>T.table[g][0]+T.table[g][1]*(st-1),earned=t=>VA_PAY.stepsAt.filter(x=>x<=t).length;
+  let g=T.g0||0,st=1,since=0;
+  for(const [at,to] of T.promo){if(yrs<at)break;st=Math.min(12,st+earned(at-since));const before=rate(g,st);g=to;let n=1;while(n<12&&rate(g,n)<=before)n++;st=n;since=at;}
+  st=Math.min(12,st+earned(yrs-since));
+  let f=1;for(let y=2027;y<=(calYear||2026);y++)f*=1+(VA_PAY.general[y]??VA_PAY.later);
+  return{pay:Math.round(rate(g,st)*f),grade:T.names[g],step:st};}
+VA_PAY.rn.start=vaPayAt('rn',0).pay;VA_PAY.rn.exp=vaPayAt('rn',4).pay;VA_PAY.np.start=vaPayAt('np',0).pay;VA_PAY.np.exp=vaPayAt('np',4).pay;
+function payPath(job,emp,years,y0){ // yearly pay: VA from its step table; a hospital rises from first-year to experienced over 3 years, then about 3% a year
+  if(emp==='va')return Array.from({length:years},(_,k)=>vaPayAt(job,k,(y0||2028)+k).pay);
+  const J=JOBS[job].cities[planView().city];return Array.from({length:years},(_,k)=>k<3?J.start+(J.exp-J.start)*k/3:J.exp*Math.pow(1+VA_PAY.hospRaise,k-3));}
 const TAX={fedStd:16100,fed65:2050,fed:[[12400,.10],[50400,.12],[105700,.22],[201775,.24],[256225,.32],[640600,.35],[1/0,.37]],
   mnStd:15300,mn:[[33310,.0535],[109430,.068],[203150,.0785],[1/0,.0985]],ssBase:184500,mnSSLimit:82190};
 const TRICARE_SELECT=186.96,PART_B=202.90;
@@ -954,19 +964,19 @@ const SS_AGE={62:.70,67:1,70:1.24};
 function planView(){S.planView=Object.assign({date:'2027-09-30',job:'rn',emp:'civ',city:'tc',stage:'start',va:'est',ss:'67',debt:'now',pay:'cash',mngi:'on'},S.planView||{});return S.planView;}
 function planResult(R,over){
   const P=S.plan,V=Object.assign({},planView(),over||{}),O=P.options[V.date]||P.options[Object.keys(P.options)[0]];
-  const mult=Math.min(.75,.025*O.points/360),retGross=Math.round(O.high3*mult);
-  const vaPct=V.va==='est'?R.rounded:+V.va,va=Math.round(monthlyPay(vaPct,calcState().dep)),crdp=vaPct>=50,ret=crdp?retGross:Math.max(0,retGross-va);
+  const mult=Math.min(.75,.025*O.points/360),cola=V.cola||1,retGross=Math.round(O.high3*mult*cola);
+  const vaPct=V.va==='est'?R.rounded:+V.va,va=Math.round(monthlyPay(vaPct,calcState().dep)*cola),crdp=vaPct>=50,ret=crdp?retGross:Math.max(0,retGross-va);
   const L=[],M=x=>Math.round(x/12);
   L.push({side:'duty',k:'Army retired pay',v:ret,note:`${(mult*100).toFixed(2)}% of a ${money(O.high3)} High-3 average (${O.grade})${crdp?'':', reduced by your VA pay because the rating is under 50%'}`});
   L.push({side:'duty',k:'VA disability',v:va,note:`${vaPct}%${V.va==='est'?' from the calculator above':' what-if'}, tax free`});
   let fedInc=ret*12,mnInc=0,fica=0,fers=0;const retired=V.stage==='retired';
   if(!retired){
-    const va=V.emp==='va',J=va?VA_PAY[V.job]:JOBS[V.job].cities[V.city],sal=V.stage==='exp'?J.exp:J.start;
-    L.push({side:'study',k:`${JOBS[V.job].name}, ${va?'Minneapolis VA':CITY[V.city]}`,v:M(sal),note:`${money0(sal)} a year, ${V.stage==='exp'?'experienced':'first year'}`});
+    const va=V.emp==='va',J=va?VA_PAY[V.job]:JOBS[V.job].cities[V.city],sal=V.sal!=null?V.sal:V.stage==='exp'?J.exp:J.start;
+    L.push({side:'study',k:`${JOBS[V.job].name}, ${va?'Minneapolis VA':CITY[V.city]}`,v:M(sal),note:`${money0(sal)} a year, ${V.yrs!=null?`year ${V.yrs+1} in the job`:V.stage==='exp'?'experienced':'first year'}`});
     if(va)fers=sal*VA_PAY.fers;
     fedInc+=sal;mnInc=sal;fica=Math.min(sal,TAX.ssBase)*.062+sal*.0145;
   }else{
-    const ss=Math.round(P.ss67*SS_AGE[V.ss]);
+    const ss=Math.round(P.ss67*SS_AGE[V.ss]*cola);
     L.push({side:'plain',k:`Social Security from age ${V.ss}`,v:ss,note:V.ss==='67'?`Full retirement age is ${P.fra}`:`${Math.round(SS_AGE[V.ss]*100)}% of your age-67 amount, for life`});
     fedInc+=ss*12*.85;
   }
@@ -978,7 +988,7 @@ function planResult(R,over){
   if(fers)out.push({k:'FERS pension contribution',v:M(fers),note:'4.4% of VA pay goes to your federal pension. The VA also puts 5% of pay in your TSP if you put in 5%.'});
   out.push(retired?{k:'Medicare Part B',v:Math.round(PART_B),note:'Required to keep TRICARE For Life, which then costs nothing'}:{k:'TRICARE Select',v:Math.round(TRICARE_SELECT/12),note:`Retiree Group A, ${money(TRICARE_SELECT)} a year in 2026. Prime is $381.96.`});
   const inc=L.reduce((a,b)=>a+b.v,0),ded=out.reduce((a,b)=>a+b.v,0),net=inc-ded;
-  const B=P.budget,spend=B?B.groups.reduce((a,g)=>a+((V.debt==='paid'&&g.debt)||(V.off&&V.off[g.k])?0:g.v),0):0;
+  const B=P.budget,spend=B?Math.round(B.groups.reduce((a,g)=>a+((V.debt==='paid'&&g.debt)||(V.off&&V.off[g.k])?0:g.debt?Math.max(0,g.v-(V.debtCut||0)):g.v*(V.infl||1)),0)):0;
   return{P,V,O,mult,retGross,ret,va,vaPct,crdp,L,out,inc,ded,net,spend,left:net-spend};
 }
 function planPath(R){ // phases of your career, using the selected date, job, city and VA view
@@ -990,7 +1000,9 @@ function planPath(R){ // phases of your career, using the selected date, job, ci
 }
 function vPlan(R){
   if(!S.plan)return `<div class="panel stack"><h3>Retirement income planner</h3><p class="small muted">Restore your Claim Kit backup (Backup & help) to load your retirement numbers.</p></div>`;
-  const X=planResult(R),V=X.V,B=X.P.budget;
+  const AI=asOfI(),AL0=AI!==null?lifeAt(AI):null,AL=AL0&&AL0.agr?Object.assign(lifeAt(ymIdx(planView().date.slice(0,7))+1),{agr:true}):AL0;let cut=0;
+  if(AL&&S.plan.debts&&S.plan.budget){const V0=planView(),sim=simDebts(R,{strat:V0.dstrat||'aval',extra:V0.dextra||'half'},debtIncome(R));cut=sim.D.filter(d=>d.end!==null&&d.end<=AI).reduce((a,d)=>a+d.pay,0);}
+  const X=planResult(R,AL?({job:AL.job,stage:AL.stage,sal:AL.sal,yrs:AL.yrs,cola:AL.cola,infl:AL.infl,debtCut:cut}):undefined),V=X.V,B=X.P.budget;
   const seg=(key,opts)=>`<div class="seg" role="group">${opts.map(([v,n])=>`<button class="btn sm ${V[key]===v?'on':''}" data-pv="${key}" data-val="${v}" aria-pressed="${V[key]===v}">${n}</button>`).join('')}</div>`;
   const line=r=>`<div class="pl-row ${r.side||''}"><div><b>${esc(r.k)}</b><div class="small muted">${esc(r.note)}</div></div><div class="amt">${money0(r.v)}<div class="small muted yr-amt">${money0(r.v*12)}/yr</div></div></div>`;
   const other=Object.keys(X.P.options).filter(d=>d!==V.date).map(d=>planResult(R,{date:d}))[0];
@@ -1014,10 +1026,13 @@ function vPlan(R){
     <div><div class="eyebrow-s">Employer</div>${seg('emp',[['civ','Hospital or clinic'],['va','The VA']])}</div>
     ${V.emp==='va'?'':`<div><div class="eyebrow-s">City</div>${seg('city',[['tc','Twin Cities'],['roch','Rochester']])}</div>`}
     <div><div class="eyebrow-s">VA rating</div>${seg('va',[['est',`My estimate (${R.rounded}%)`],['70','70%'],['100','100%']])}</div>
-    <div><div class="eyebrow-s">Stage</div>${seg('stage',[['start','First year working'],['exp','Experienced'],['retired','Fully retired']])}</div>
+    ${AL?'':`<div><div class="eyebrow-s">Stage</div>${seg('stage',[['start','First year working'],['exp','Experienced'],['retired','Fully retired']])}</div>`}
     ${V.stage==='retired'?`<div><div class="eyebrow-s">Start Social Security at</div>${seg('ss',[['62','62'],['67','67'],['70','70']])}</div>`:''}
    </div>
-   <div class="calc-head"><div><div class="eyebrow-s">Take-home a month</div><div class="big">${money0(X.net)}</div><div class="small muted">${money0(X.net*12)} a year after tax and health costs</div></div>
+   ${asOfBar()}
+   ${AL&&AL.agr?`<p class="small warnbox">On ${ym(AI)} you are still on AGR orders, taking home about ${money0(X.P.budget?X.P.budget.nowIncome:0)} a month. The numbers below are for your first nursing job after AGR.</p>`:''}
+   ${AL&&cut?`<p class="small">By ${ym(AI)} the Debt plan has paid off debts with ${money0(cut)} a month of payments, so spending below is that much lower.</p>`:''}
+   <div class="calc-head"><div><div class="eyebrow-s">Take-home a month${AL?` on ${ym(AI)}`:''}</div><div class="big">${money0(X.net)}</div><div class="small muted">${money0(X.net*12)} a year after tax and health costs</div></div>
     ${B?`<div><div class="eyebrow-s">Left over after spending</div><div class="big ${X.left>=0?'pos':'neg'}" style="font-size:2rem">${X.left>=0?'':'−'}${money0(Math.abs(X.left))}</div><div class="small muted">${X.left>=0?'':'−'}${money0(Math.abs(X.left*12))} a year, ${V.debt==='paid'?'with debts paid off':'with today\'s debt payments'}</div></div>`:''}</div>
    <div class="pl-list"><div class="eyebrow-s">Income</div>${X.L.map(line).join('')}<div class="eyebrow-s" style="margin-top:10px">Taxes and costs</div>${X.out.map(line).join('')}</div>
    ${bud}
@@ -1034,17 +1049,17 @@ function vPlan(R){
 }
 function vVaJob(R){ // working for the VA: pay scale, raises and benefits next to a hospital job
   const V=planView(),P=S.plan,job=V.job,N=21,r0=ymIdx(V.date.slice(0,7))+1,y0=job==='np'?Math.max(r0,ymIdx(P.npStart||'2030-07')):r0,Y0=Math.ceil(y0/12);
-  const va=payPath(job,'va',N),civ=payPath(job,'civ',N),xs=Array.from({length:N},(_,k)=>(Y0+k)*12);
+  const va=payPath(job,'va',N,Y0),civ=payPath(job,'civ',N,Y0),xs=Array.from({length:N},(_,k)=>(Y0+k)*12);
   const ageStart=(r0-ymIdx(P.born))/12,yrs62=Math.max(0,Math.floor(62-ageStart)),atEnd=Math.max(0,Math.floor(62-(y0-ymIdx(P.born))/12)),hi3=va.slice(Math.max(0,atEnd-3),atEnd).reduce((a,b)=>a+b,0)/3||va[0];
   const pen=Math.round(hi3*.01*yrs62/12),match=va.slice(0,atEnd).reduce((a,b)=>a+b*VA_PAY.match,0);
   const tile=(lab,big,sub)=>`<div class="tile"><div class="eyebrow-s">${lab}</div><div class="tbig">${big}</div><div class="small muted">${sub}</div></div>`;
   const nm=job==='np'?'PMHNP':'RN';
   return `<div class="panel-in stack"><div class="eyebrow-s">Working for the VA</div>
    <p class="small">${V.emp==='va'?'You are looking at the VA option. The take-home above uses Minneapolis VA pay.':'Switch Employer to <b>The VA</b> above to run every number with VA pay.'} The Minneapolis VA Health Care System also runs the Rochester VA clinic, so the same pay applies to both cities.</p>
-   <div class="pl-list"><div class="eyebrow-s">VA nurse pay, Minneapolis 2026</div>${VA_PAY.grades.map(g=>`<div class="pl-row"><div><b>${g[0]}</b><div class="small muted">${g[1]}</div></div><div class="amt small">${g[2]}</div></div>`).join('')}</div>
+   <div class="pl-list"><div class="eyebrow-s">VA nurse pay, Minneapolis 2026 (step 1 to step 12)</div>${[['rn',0,'New BSN grad'],['rn',1,'BSN with about 2 years, or an MSN'],['rn',2,'MSN or DNP in an RN role'],['np',0,'New nurse practitioner'],['np',1,'NP with a DNP, or some NP years'],['np',2,'Experienced NP']].map(([j,g,who])=>{const T=VA_PAY[j].table[g];return `<div class="pl-row"><div><b>${VA_PAY[j].names[g]}</b><div class="small muted">${who}</div></div><div class="amt small">${money0(T[0])} to ${money0(T[0]+T[1]*11)}<div class="muted">+${money0(T[1])} a step</div></div></div>`;}).join('')}</div>
    <div class="tiles">${tile(`${nm} year 1`,money0(va[0]),`VA, vs ${money0(civ[0])} at a hospital`)}${tile(`${nm} year 10`,money0(va[9]),`VA, vs ${money0(civ[9])} at a hospital`)}${tile('VA pension at 62',`${money0(pen)}/mo`,`after ${yrs62} years at the VA, for life, on top of your Army pay`)}</div>
    ${lineChart('vapay',{xs,tiplab:i=>`${i/12} (age ${Math.floor((i-ymIdx(P.born))/12)})`,aria:'Yearly pay at the VA and at a hospital over 20 years',series:[{n:`VA ${nm}`,v:va,c:'var(--s1)',fill:true},{n:`Hospital ${nm}`,v:civ,c:'var(--s2)'}]})}
-   <p class="small"><b>How VA raises work.</b> Every January VA pay goes up with the federal raise: 2% in 2025, 1% in 2026, and 0% proposed for 2027 (not final). On top of that you get step raises of about 3% each, more often in your first years, plus a promotion from Nurse I to Nurse II, usually after 1 to 2 years with a BSN. The VA also resets its Minneapolis pay table when local hospitals pay more. This chart uses about 2% a year at the VA after year 3 and 3% at a union hospital, so the hospital pulls ahead over time while the VA adds a pension and TSP match.</p>
+   <p class="small"><b>How VA raises work.</b> Every January VA pay goes up with the federal raise: 2% in 2025, 1% in 2026, and 0% proposed for 2027 (not final). On top of that each grade has 12 steps, about 3% apart. This chart assumes a step every year at first, then every 2 years, then every 3 (ask HR for the exact waiting periods), plus a promotion ${job==='np'?'to APRN grade III after 3 years':'from Nurse I to Nurse II after about 2 years'}. After 2027 it assumes a 2% federal raise each year, and 3% a year at a union hospital. The VA also resets its Minneapolis table when local hospitals pay more.</p>
    <details><summary class="small"><b>VA benefits worth money</b></summary><ul class="small">
     <li><b>TSP match:</b> the VA adds 1% of pay automatically and matches up to 4% more when you put in 5%. That is about ${money0(va[0]*VA_PAY.match)} a year at first, about ${money0(match)} by age 62 before growth.</li>
     <li><b>FERS pension:</b> 1% of your highest 3 years of pay for each year worked (1.1% if you stay to 62 with 20 years). You pay 4.4% of pay toward it, shown in taxes and costs above. Your Army years can't be added because you get Army retired pay.</li>
@@ -1053,7 +1068,7 @@ function vVaJob(R){ // working for the VA: pay scale, raises and benefits next t
     <li><b>Extra pay:</b> about 10% more for evening and night shifts and 25% more on weekends.</li>
     <li><b>Leave:</b> 13 days of vacation a year to start (20 after 3 years), 13 sick days and 11 federal holidays. Your Army years don't speed this up unless your retirement is disability or combat related.</li>
     <li><b>Health:</b> keep TRICARE as a retiree. You can skip the federal health plan.</li></ul>
-    <p class="small muted">${esc(VA_PAY[job].src)} The VA's official 2026 Minneapolis nurse pay table wasn't readable from here, so ask a Minneapolis VA nurse recruiter for it to confirm your grade and step.</p></details></div>`;
+    <p class="small muted">${esc(VA_PAY[job].src)} A nurse professional standards board sets your starting grade and step, and it can start you higher for experience, including Army time.</p></details></div>`;
 }
 const DNP_FEES={ // herzing.edu/fee-schedule; used when the plan has no fees of its own
   perTerm:[{k:'Nursing Program Fee',v:850,note:'Every semester. Includes the background check before clinicals.'}],
@@ -1125,12 +1140,32 @@ function budgetToggles(B,opts){ // one switch per expense; off expenses drop out
 function nonDebtSpend(){const B=S.plan.budget,off=offSet();return B.groups.reduce((a,g)=>a+(g.debt||off[g.k]?0:g.v),0);}
 const ym=i=>`${MON[i%12]} ${Math.floor(i/12)}`;
 const ymIdx=s=>{const [y,m]=s.split('-').map(Number);return y*12+m-1;};
+const INFL=.025; // yearly cost-of-living raise on Army and VA pay, and yearly rise in living costs
+const nowIdx=()=>{const d=new Date();return d.getFullYear()*12+d.getMonth();};
+const idxYM=i=>`${Math.floor(i/12)}-${String(i%12+1).padStart(2,'0')}`;
+const asOfI=()=>{const V=planView();return V.asof?ymIdx(V.asof):null;};
+function lifeAt(i){ // what you are doing in month i under the current switches, with pay raises and cost-of-living raises
+  const V=planView(),P=S.plan,rm=ymIdx(V.date.slice(0,7)),npI=ymIdx(P.npStart||'2030-07'),full=ymIdx(P.born)+12*67,f=Math.pow(1+INFL,Math.max(0,i-nowIdx())/12);
+  if(i<=rm)return{agr:true,label:'On AGR orders',infl:f};
+  if(i>=full)return{stage:'retired',job:V.job,label:'Fully retired, Social Security from '+V.ss,cola:f,infl:f};
+  const job=V.job==='np'&&i>=npI?'np':'rn',st=job==='np'?Math.max(npI,rm+1):rm+1,yrs=Math.floor((i-st)/12);
+  return{job,stage:yrs<1?'start':'exp',yrs,sal:Math.round(payPath(job,V.emp,yrs+1,Math.floor(st/12))[yrs]),cola:f,infl:f,label:`${job==='np'?'PMHNP':'RN'}, year ${yrs+1}${V.emp==='va'?' at the VA':''}`};}
 function debtIncome(R){ // take-home for each month of the plan, from the same toggles as the calculator
-  const V=planView(),P=S.plan,start=ymIdx(P.debtStart),rm=ymIdx(V.date.slice(0,7)),npStart=ymIdx(P.npStart||'2030-07');
-  const cache={},net=o=>{const k=o.job+o.stage;return cache[k]??=planResult(R,o).net;};
-  return Array.from({length:DEBT_YEARS*12},(_,t)=>{const i=start+t;if(i<=rm)return P.budget.nowIncome;
-    return net({job:V.job==='np'&&i>=npStart?'np':'rn',stage:i-rm<=12?'start':'exp'});});
+  const P=S.plan,start=ymIdx(P.debtStart),cache={};
+  return Array.from({length:DEBT_YEARS*12},(_,t)=>{const i=start+t,L=lifeAt(i);if(L.agr)return P.budget.nowIncome;
+    const k=[L.job,L.stage,L.sal,Math.round(L.cola*200)].join();return cache[k]??=planResult(R,{job:L.job,stage:L.stage,sal:L.sal,yrs:L.yrs,cola:L.cola}).net;});
 }
+function asOfBar(){ // pick a date to see every number as of then
+  const V=planView(),n0=nowIdx(),i=asOfI(),k=i===null?0:Math.max(0,i-n0),rm=ymIdx(V.date.slice(0,7))+1,L=i===null?null:lifeAt(i);
+  const q=(lab,to)=>`<button class="btn sm ${(to===''?i===null:i===to)?'on':''}" data-asof="${to===''?'':idxYM(to)}">${lab}</button>`;
+  return `<div class="panel-in stack asof"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><div class="eyebrow-s">View as of</div><b id="asofLab">${i===null?'Today':ym(i)}</b></div>
+    <input type="range" id="asofRange" min="0" max="${Math.max(240,ymIdx(S.plan&&S.plan.born||'1982-06')+70*12-n0)}" step="1" value="${k}" aria-label="Months from now">
+   <div class="seg" role="group">${q('Today','')}${q('After AGR',rm)}${q('+1 year',n0+12)}${q('+5 years',n0+60)}${q('+10 years',n0+120)}</div>
+   ${L?`<p class="small">On ${ym(i)}: <b>${esc(L.label)}</b>. Pay includes raises, Army and VA pay include ${INFL*100}% yearly cost-of-living raises, and living costs rise ${INFL*100}% a year.</p>`:''}</div>`;}
+function bindAsOf(){const r=$('#asofRange');if(!r)return;const n0=nowIdx(),set=v=>{planView().asof=v;save();render();};
+  r.oninput=()=>{$('#asofLab').textContent=+r.value?ym(n0+ +r.value):'Today';};
+  r.onchange=()=>{const k=+r.value;set(k?idxYM(n0+k):'');};
+  document.querySelectorAll('[data-asof]').forEach(b=>b.onclick=()=>set(b.dataset.asof));}
 function simDebts(R,o,INC){ // o.strat: min | aval | snow | first ; o.first: id ; o.extra: none | half | all ; o.invest: put spare money in investments
   const P=S.plan,start=ymIdx(P.debtStart),base=nonDebtSpend();
   const D=P.debts.map(d=>({...d,b:d.bal,int:0,end:null}));const totMin=D.reduce((a,d)=>a+d.pay,0);
@@ -1142,17 +1177,17 @@ function simDebts(R,o,INC){ // o.strat: min | aval | snow | first ; o.first: id 
   let inv=0,cash=0,totInt=0,free=null,short=0;const rows=[];
   for(let t=0;t<INC.length;t++){
     let intM=0;D.forEach(d=>{if(d.b>0){const i=d.b*d.apr/12;d.b+=i;d.int+=i;totInt+=i;intM+=i;}});
-    const spare=INC[t]-base-totMin;let extra=spare>0?(o.extra==='all'?spare:o.extra==='half'?spare/2:0):0;
+    const liv=base*Math.pow(1+INFL,t/12),spare=INC[t]-liv-totMin;let extra=spare>0?(o.extra==='all'?spare:o.extra==='half'?spare/2:0):0;
     let budget=o.strat==='min'?0:totMin+extra,paid=0;
     D.forEach(d=>{if(d.b>0){const p=Math.min(d.pay,d.b);d.b-=p;paid+=p;}});
     if(o.strat!=='min'){let room=budget-paid;for(const d of order()){if(room<=0)break;const p=Math.min(room,d.b);d.b-=p;paid+=p;room-=p;}}
     else extra=0;
     D.forEach(d=>{if(d.b<=.5&&d.end===null){d.b=0;d.end=start+t;}});
-    let left=INC[t]-base-paid; // what is left after living costs and debt payments
+    let left=INC[t]-liv-paid; // what is left after living costs and debt payments
     if(left<0){const c=D.find(d=>d.id===P.shortfallTo)||D[0];c.b+=-left;if(c.end!==null)c.end=null;short+=-left;left=0;}
     if(o.invest)inv=inv*(1+INVEST_RATE/12)+left;else cash+=left;
     const debt=D.reduce((a,d)=>a+d.b,0);if(free===null&&debt<=.5)free=start+t;
-    rows.push({i:start+t,bal:D.map(d=>d.b),debt,inv,cash,net:inv+cash-debt,paid,intM});
+    rows.push({i:start+t,bal:D.map(d=>d.b),debt,inv,cash,net:inv+cash-debt,paid,intM,liv});
   }
   return{D,rows,totInt,free,short,start};
 }
@@ -1191,6 +1226,8 @@ function vDebt(){
     const pts=hi.map((v,j)=>`${F.X(start+j).toFixed(1)},${F.Y(v).toFixed(1)}`).join(' ')+' '+lo.map((v,j)=>`${F.X(start+j).toFixed(1)},${F.Y(v).toFixed(1)}`).reverse().join(' ');
     areas+=`<polygon points="${pts}" style="fill:${col(k)}" class="area"/>`;}
   const marks=evIn.map((e,n)=>`<line x1="${F.X(e.i)}" x2="${F.X(e.i)}" y1="${pad.t}" y2="${h-pad.b}" class="evl ${e.side}"/><circle cx="${F.X(e.i)}" cy="${pad.t+9+(n%3)*16}" r="8" class="evc ${e.side}"/><text x="${F.X(e.i)}" y="${pad.t+13+(n%3)*16}" class="evn" text-anchor="middle">${n+1}</text>`).join('');
+  const AI=asOfI(),aOn=AI!==null&&AI>=start&&AI<=end;
+  const asMark=aOn?`<line x1="${F.X(AI)}" x2="${F.X(AI)}" y1="${pad.t}" y2="${h-pad.b}" class="asofl"/><text x="${Math.min(F.X(AI)+4,w-60)}" y="${h-pad.b-6}" class="ax">${ym(AI)}</text>`:'';
   CHARTS.bal={start,end,pad,w,rows:NR.map(r=>({lab:ym(r.i),vals:P.debts.map((d,k)=>[d.name,r.bal[k],col(k)]).filter(v=>v[1]>.5),tot:r.debt}))};
   const legend=P.debts.map((d,k)=>`<span class="lg"><i style="background:${col(k)}"></i>${esc(d.name)}</span>`).join('');
   // chart 2: payoff dates
@@ -1236,10 +1273,13 @@ function vDebt(){
    <div class="tiles">${tile('Debt free',plan.free!==null?ym(plan.free):'Not by '+Math.floor((start+INC.length)/12),`${stratName}${mins.free!==null&&plan.free!==null&&mins.free>plan.free?`, ${Math.round((mins.free-plan.free)/12*10)/10} years sooner than minimums`:''}`)}
     ${tile('Interest you pay',money0(plan.totInt),V.dstrat==='min'?'paying minimums':`${money0(mins.totInt-plan.totInt)} less than minimums`)}
     ${tile('Worth by '+(P.compareTo||'2036-12').slice(0,4),sgn(nA),V.dstrat==='min'?'investments minus debts':`${nA>=nB?sgn(nA-nB)+' more':sgn(nB-nA)+' less'} than investing instead`)}</div>
+   ${asOfBar()}
+   ${AI!==null&&AI>=start&&AI<start+plan.rows.length?(()=>{const r=plan.rows[AI-start],m=mins.rows[AI-start],done=plan.D.filter(d=>d.end!==null&&d.end<=AI&&d.bal>0);
+     return `<div class="tiles">${tile(`Owed on ${ym(AI)}`,money0(r.debt),r.debt<1?'debt free by then':`${money0(m.debt-r.debt)} less than paying minimums`)}${tile('Paid off by then',String(done.length)+' of '+P.debts.filter(d=>d.bal>0).length,done.map(d=>esc(d.short||d.name)).join(', ')||'none yet')}${tile('Freed up each month',money0(done.reduce((a,d)=>a+d.pay,0)),'from debts you finished')}</div>`;})():''}
    ${plan.short>0?`<p class="small warnbox">Until your income rises, spending plus debt payments is more than you take home. This plan adds that gap, about ${money0(plan.short)} in total, to your ${esc((P.debts.find(d=>d.id===P.shortfallTo)||P.debts[0]).name)}. Turning off expenses below shrinks it.</p>`:''}
   </div>
   <div class="panel stack"><div class="eyebrow-s">What you owe over time</div>
-   <div class="chart-wrap" data-chart="bal"><svg viewBox="0 0 ${w} ${h}" class="viz" role="img" aria-label="Debt balances over time, stacked by debt">${F.g}${areas}${marks}<line class="xh" x1="0" x2="0" y1="${pad.t}" y2="${h-pad.b}" style="display:none"/><rect class="hit" x="${pad.l}" y="${pad.t}" width="${w-pad.l-pad.r}" height="${h-pad.t-pad.b}"/></svg><div class="tip" hidden></div></div>
+   <div class="chart-wrap" data-chart="bal"><svg viewBox="0 0 ${w} ${h}" class="viz" role="img" aria-label="Debt balances over time, stacked by debt">${F.g}${areas}${marks}${asMark}<line class="xh" x1="0" x2="0" y1="${pad.t}" y2="${h-pad.b}" style="display:none"/><rect class="hit" x="${pad.l}" y="${pad.t}" width="${w-pad.l-pad.r}" height="${h-pad.t-pad.b}"/></svg><div class="tip" hidden></div></div>
    <div class="legend">${legend}</div>
    <div class="eyebrow-s" style="margin-top:6px">Decision points</div><ol class="evs">${evList}</ol></div>
   <div class="panel stack"><div class="eyebrow-s">When each debt ends</div>
@@ -1316,15 +1356,20 @@ function vMoney(){
   const tile=(lab,big,sub)=>`<div class="tile"><div class="eyebrow-s">${lab}</div><div class="tbig">${big}</div><div class="small muted">${sub}</div></div>`;
   const card=(t,body,note)=>`<div class="panel stack"><div class="eyebrow-s">${t}</div>${body}${note?`<p class="small">${note}</p>`:''}</div>`;
   const marks=[{i:rm+1,lab:'Retire AGR',side:'duty'}];if(plan.free!==null)marks.push({i:plan.free,lab:'Debt free'});
-  const age=i=>Math.floor((i-ymIdx(P.born))/12);
+  const age=i=>Math.floor((i-ymIdx(P.born))/12),AI=asOfI();
+  if(AI!==null)marks.push({i:AI,lab:ym(AI),side:'asof'});
   let out='';
+  if(AI!==null&&AI>=start&&AI<start+INC.length){const iv=simDebts(R,{strat:V.dstrat,extra:V.dextra,invest:true},INC),r=iv.rows[AI-start],mb=H?mortgage(H,start,AI-start+1).bal[AI-start]:0,hv=H?homeVal(H,AI):0;
+    const tx=H?homeTax(H,homeVal(H,ymIdx(`${Math.floor(AI/12)-1}-01`)),R.rounded>=100?'100':R.rounded>=70?'70':'reg').tax:0;
+    out+=`<div class="panel stack"><div class="eyebrow-s">On ${ym(AI)} (age ${age(AI)})</div><div class="tiles">${tile('Net worth',sgn(r.net+(H?hv-mb:0)),'investments plus home equity, minus debts')}${tile('Investments',money0(r.inv),`at ${Math.round(INVEST_RATE*100)}% a year`)}${tile('Debts left',money0(r.debt),r.debt<1?'debt free':'not counting the mortgage')}
+      ${H?tile('Mortgage left',money0(mb),`home worth about ${money0(hv)}`)+tile(`Property tax ${Math.floor(AI/12)}`,money0(tx),R.rounded>=70?`with your ${R.rounded}% rating`:'regular homestead'):''}${tile('Take-home',money0(INC[AI-start]),'that month')}</div></div>`;}
   if(V.msec==='plan'){
     const off=offSet(),B=P.budget,items=B.groups.map((g,k)=>({lab:g.k,v:off[g.k]?0:g.v,c:off[g.k]?'var(--line)':g.debt?'var(--s3)':c(1),txt:off[g.k]?'off':money0(g.v),tip:g.note||g.k})).sort((a,b)=>b.v-a.v);
     const spendNow=B.groups.reduce((a,g)=>a+(off[g.k]?0:g.v),0);
     out+=`<div class="tiles">${tile('Take-home now',money0(B.nowIncome),'a month on AGR')}${tile('Spending now',money0(spendNow),'with your expense switches')}${tile('Left over',sgn(B.nowIncome-spendNow),'a month, before retiring')}</div>`;
     out+=card('Where your money goes each month',hbars(items,{aria:'Monthly spending by group'}),`Debt payments are ${pct0((B.groups.find(g=>g.debt)||{v:0}).v/Math.max(1,spendNow))} of what you spend. Turn expenses on or off on the Calculator or Debt plan tab and every chart here follows.`);
     const N=Math.min(INC.length,8*12),xs=Array.from({length:N},(_,t)=>start+t),base=nonDebtSpend();
-    out+=card('Money in and money out, month by month',lineChart('cash',{xs,aria:'Take-home and spending each month',marks,series:[{n:'Take-home',v:INC.slice(0,N),c:c(1),fill:true},{n:'Living costs plus debt payments',v:plan.rows.slice(0,N).map(r=>base+r.paid),c:c(2)}]}),
+    out+=card('Money in and money out, month by month',lineChart('cash',{xs,aria:'Take-home and spending each month',marks,series:[{n:'Take-home',v:INC.slice(0,N),c:c(1),fill:true},{n:'Living costs plus debt payments',v:plan.rows.slice(0,N).map(r=>r.liv+r.paid),c:c(2)}]}),
       `When the blue line is above the other one you have money left over. Retirement changes your take-home, and each debt you finish drops the second line.`);
     const inv=simDebts(R,{strat:V.dstrat,extra:V.dextra,invest:true},INC),invM=simDebts(R,{strat:'min',extra:'none',invest:true},INC),NN=INC.length,xs2=Array.from({length:NN},(_,t)=>start+t);
     const eq=H?xs2.map((i,t)=>homeVal(H,i)-mortgage(H,start,NN).bal[t]):null;
@@ -1392,6 +1437,7 @@ function vMoney(){
 }
 function moneyHead(V){const P=S.plan;return `<div class="panel stack"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3>Money charts</h3><span class="small muted">Uses the same switches as the Calculator and Debt plan</span></div>
   ${segBtns(V,'msec',[['plan','Planning'],['debt','Debt'],['invest','Investing'],['home','Property tax']])}
+  ${asOfBar()}
   <div class="row" style="gap:8px;flex-wrap:wrap"><div><div class="eyebrow-s">Retire from AGR</div>${segBtns(V,'date',Object.entries(P.options).map(([d,o])=>[d,o.label]))}</div><div><div class="eyebrow-s">Nursing job</div>${segBtns(V,'job',[['rn','BSN RN'],['np','PMHNP']])}</div><div><div class="eyebrow-s">Employer</div>${segBtns(V,'emp',[['civ','Hospital'],['va','The VA']])}</div></div></div>`;}
 function bindDebt(){bindPlan();bindCharts();}
 function bindCharts(){
@@ -1405,7 +1451,7 @@ function bindCharts(){
     svg.querySelectorAll('[data-tip]').forEach(m=>{const sh=ev=>{const r=wr.getBoundingClientRect();tip.textContent=m.dataset.tip;tip.hidden=false;tip.style.left=Math.min(Math.max(0,ev.clientX-r.left+10),r.width-tip.offsetWidth)+'px';tip.style.top=Math.max(0,ev.clientY-r.top-40)+'px';};
       m.addEventListener('pointermove',sh);m.addEventListener('pointerdown',sh);m.addEventListener('pointerleave',()=>tip.hidden=true);});});
 }
-function bindPlan(){document.querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{planView()[b.dataset.pv]=b.dataset.val;save();render();});
+function bindPlan(){bindAsOf();document.querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{planView()[b.dataset.pv]=b.dataset.val;save();render();});
   document.querySelectorAll('[data-poff]').forEach(c=>c.onchange=()=>{const o=offSet();if(c.checked)delete o[c.dataset.poff];else o[c.dataset.poff]=true;save();render();});}
 
 const VIEWS={calc:[vCalc,()=>{bindCalc();bindCharts();}],debt:[vDebt,bindDebt],money:[vMoney,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup]};
