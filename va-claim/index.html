@@ -318,10 +318,10 @@ async function saveToFile(){ // Chrome and Edge can write straight into the file
   S.savedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}
   if(window.showSaveFilePicker){
     try{if(!FILE.handle){const old=await idbGet();if(old&&(await old.requestPermission({mode:'readwrite'}))==='granted')FILE.handle=old;}
-      if(!FILE.handle){FILE.handle=await showSaveFilePicker({suggestedName:'Claim Kit.html',types:[{description:'Claim Kit',accept:{'text/html':['.html']}}]});idbPut(FILE.handle);}
+      if(!FILE.handle){FILE.handle=await showSaveFilePicker({suggestedName:(S.appName||'Claim Kit')+'.html',types:[{description:'Claim Kit',accept:{'text/html':['.html']}}]});idbPut(FILE.handle);}
       if(await writeFile()){toast('Saved into the file');return;}}
     catch(e){if(e&&e.name==='AbortError')return;}}
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([fileCopy()],{type:'text/html'}));a.download='Claim Kit.html';document.body.appendChild(a);a.click();a.remove();
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([fileCopy()],{type:'text/html'}));a.download=(S.appName||'Claim Kit')+'.html';document.body.appendChild(a);a.click();a.remove();
   FILE.savedAt=S.savedAt;renderFileBar();toast('Saved a new copy to Downloads');}
 function renderFileBar(){const el=$('#fileBar');if(!el)return;const dirty=(S.savedAt||0)>(FILE.savedAt||0);
   el.innerHTML=`<div class="filebar ${dirty?'dirty':''}"><span class="small">${FILE.handle?'<b>Auto-save is on.</b> Every change is written into this file.':dirty?'<b>You have changes not saved in the file yet.</b> They are kept in this browser too.':'<b>Your data is saved inside this file.</b>'}</span><button class="btn sm ${dirty&&!FILE.handle?'primary':''}" id="saveFile">${FILE.handle?'Save now':'Save to file'}</button></div>`;
