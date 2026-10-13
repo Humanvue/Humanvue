@@ -362,7 +362,7 @@ function progress(){
 }
 
 /* ---------- Tabs ---------- */
-const TABS=[['dash','Dashboard'],['cal','Calendar'],['rw','Rewards'],['steps','Steps'],['me','About me'],['conds','Conditions'],['scan','Scan records'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['dates','Deadlines'],['calc','Calculator'],['debt','Debt plan'],['money','Money charts'],['save','Savings & taxes'],['spend','Spending'],['backup','Backup & help']];
+const TABS=[['dash','Dashboard'],['cal','Calendar'],['rw','Rewards'],['steps','Steps'],['me','About me'],['conds','Conditions'],['scan','Scan records'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['dates','Deadlines'],['calc','Calculator'],['debt','Debt plan'],['money','Money charts'],['save','Savings & taxes'],['spend','Spending'],['dream','Dreams'],['wish','Wishlist'],['backup','Backup & help']];
 function renderTabs(){
   $('#tabs').innerHTML=TABS.map(([id,n])=>`<button role="tab" id="tab-${id}" aria-selected="${S.tab===id}" data-tab="${id}">${n}</button>`).join('');
 }
@@ -1205,7 +1205,7 @@ function simDebts(R,o,INC){ // o.strat: min | aval | snow | first ; o.first: id 
   return{D,rows,totInt,free,short,start};
 }
 const niceStep=x=>{const p=Math.pow(10,Math.floor(Math.log10(x))),f=x/p;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p;};
-const fmtK=n=>Math.abs(n)>=1000?`$${(n/1000).toFixed(Math.abs(n)>=100000?0:1)}k`:money0(n);
+const fmtK=n=>Math.abs(n)>=1e6?`${n<0?'−':''}$${(Math.abs(n)/1e6).toFixed(2)}M`:Math.abs(n)>=1000?`$${(n/1000).toFixed(Math.abs(n)>=100000?0:1)}k`:money0(n);
 const sgn=n=>`${n<0?'−':''}${money0(Math.abs(n))}`;
 function chartFrame(w,h,pad,ymax,ticks,xa,xb){ // y grid + x year labels
   const X=i=>pad.l+(i-xa)/(xb-xa)*(w-pad.l-pad.r),Y=v=>h-pad.b-v/ymax*(h-pad.t-pad.b);let g='';
@@ -1752,7 +1752,89 @@ function bindRewards(){const W=S.rw,today=dkey(new Date()),wk=wkKey(new Date());
   document.querySelectorAll('[data-rwd]').forEach(c=>c.onchange=()=>{W.days[today][c.dataset.rwd]=c.checked;save();render();if(c.checked)toast('Nice work');});
   document.querySelectorAll('[data-rww]').forEach(c=>c.onchange=()=>{W.weeks[wk][c.dataset.rww]=c.checked;save();render();});}
 
-const VIEWS={calc:[vCalc,()=>{bindCalc();bindCharts();}],debt:[vDebt,bindDebt],money:[vMoney,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup],dates:[vDates,bindDates],save:[vSave,bindSave],cal:[vCal,bindCal],spend:[vSpend,()=>bindCharts()],rw:[vRewards,bindRewards]};
+/* ---------- Dreams: a wooded hobby farm with a barndominium, shop, gym and solar (Minnesota prices, 2026) ---------- */
+const DREAM_ITEMS=[ // [id, phase, name, low, high, what it covers]
+ ['land',1,'Wooded land, 5 to 10 acres',125000,300000,'Raw wooded land within about 45 minutes of the Twin Cities lists for $125k to $250k (asking prices, Oct 2026). Closer in or with a house costs far more.'],
+ ['site',1,'Well, septic, driveway, power, clearing',56000,145000,'Well $15k to $30k, septic $15k to $30k (many Minnesota lots need a mound), driveway $8k to $25k, power line $8k to $30k, clearing and pad $10k to $30k.'],
+ ['barndo',1,'Barndominium living space, about 1,800 sq ft',250000,360000,'Turnkey, mid-range finish at about $140 to $200 a sq ft. Minnesota frost footings and insulation sit at the high end of national prices.'],
+ ['shop',1,'Heated garage and workshop for 4 vehicles, 40×60 ft',130000,215000,'2,400 sq ft with 14 to 16 ft walls for a lift, in-floor heat, insulated, concrete floor, 4 overhead doors.'],
+ ['lift',2,'Vehicle lift (2-post or 4-post)',5000,12000,'Needs a thick slab section and at least 12 ft of clear height.'],
+ ['solar',2,'Solar as the main power: about 20 kW ground mount plus batteries',90000,130000,'About $3 a watt installed, plus 30 to 40 kWh of batteries and a backup generator. The 30% federal credit for homeowners ended after 2025, and Minnesota has no state solar credit; check the rural electric co-op for rebates and net metering.'],
+ ['gym',3,'Indoor CrossFit gym, 30×40 ft',80000,145000,'1,200 sq ft with 16 to 18 ft ceilings for rope climbs and wall balls, rubber floor, heat and fans, plus $10k to $25k of equipment.'],
+ ['barn',3,'Small barn, pasture fence and water for 4 to 5 rescues',35000,75000,'24×36 barn with stalls and hay storage, 3 to 5 acres of fence, and a heated waterer. Goats, sheep, a donkey or mini horses, or pigs.'],
+ ['soft',0,'Design, permits and contingency (12%)',0,0,'Added on top of everything you include.']];
+const DREAM_PH=['','Phase 1: land, home and shop','Phase 2: power and lift','Phase 3: gym and animals'];
+const DREAM_LIST=[ // asking prices seen 13 Oct 2026; check each link, listings change
+ ['Ravenna Trail, Hastings (Dakota Co.)','26.3 acres, heavily wooded, no buildings',200000,'https://www.land.com/property/26.33-acres-in-dakota-county-minnesota/28748753/','land'],
+ ['Furlong Trail, Hastings (Dakota Co.)','3.26 acres, no buildings',149900,'https://www.land.com/property/3.26-acres-in-dakota-county-minnesota/28617318/','land'],
+ ['Sunset Trail, Welch (Goodhue Co.)','17 acres, river frontage, hunting land',125000,'https://www.land.com/property/17-acres-in-goodhue-county-minnesota/28153973/','land'],
+ ['County 45 Blvd, Red Wing (Goodhue Co.)','9.85 acres, no buildings',209000,'https://www.land.com/property/xxx-county-45-blvd-red-wing-minnesota-55066/28326888/','land'],
+ ['Pilar Rd, Scandia (Washington Co.)','7.35 acres, residential land',250000,'https://www.landsearch.com/properties/pilar-rd-scandia-mn-55073/5479488','land'],
+ ['Acacia Trl, Stanchfield (Chisago Co.)','14 acres, 3 bed house, found in a barn search',485000,'https://www.landsearch.com/properties/46295-acacia-trl-stanchfield-mn-55080/5569399','home'],
+ ['345th St, Center City (Chisago Co.)','9.78 acres, 3 bed house, found in a barn search',549900,'https://www.landsearch.com/properties/15977-345th-st-center-city-mn-55012/5583316','home'],
+ ['Iona Ave, Morristown (Rice Co.)','7 acres, 4 bed house, found in a barn search',575000,'https://www.landsearch.com/properties/24412-iona-ave-morristown-mn-55052/5541690','home'],
+ ['Hogan Ave, Randolph (Dakota Co.)','4.64 acres, 5 bed house',699000,'https://www.land.com/property/28430-hogan-avenue-randolph-minnesota-55065/28868764/','home']];
+const DREAM_SEARCH=[['LandWatch: Minnesota land','https://www.landwatch.com/minnesota-land-for-sale'],['Land.com: Dakota County','https://www.land.com/Dakota-County-MN/all-land/'],['Land.com: Goodhue County','https://www.land.com/Goodhue-County-MN/all-land/'],['LandSearch: Minnesota with barns','https://www.landsearch.com/barn/minnesota'],['Land and Farm: Minnesota','https://www.landandfarm.com/search/minnesota-land-for-sale/']];
+function dreamState(){S.dream=Object.assign({on:{},rate:'6.5'},S.dream||{});DREAM_ITEMS.forEach(([id])=>{if(S.dream.on[id]==null)S.dream.on[id]=true;});return S.dream;}
+function dreamCost(phases){const D=dreamState();let lo=0,hi=0;DREAM_ITEMS.forEach(([id,ph,,l,h])=>{if(ph&&D.on[id]&&phases.includes(ph)){lo+=l;hi+=h;}});const f=D.on.soft?1.12:1;return{lo:lo*f,hi:hi*f,mid:(lo+hi)/2*f};}
+function buyingPower(R,i,debtPay){ // what a lender might let you borrow in month i, plus the cash from selling your home
+  const P=S.plan,L=lifeAt(i),D=dreamState(),r=+D.rate/100/12,n=360;let G;
+  if(L.agr)G=(P.agrWages||Math.round((P.options[planView().date]||Object.values(P.options)[0]).high3*12))/12+(P.agrAllow||0);
+  else{const X=planResult(R,{job:L.job,stage:L.stage,sal:L.sal,yrs:L.yrs,cola:L.cola});G=X.inc+X.va*.25;} // lenders gross up tax-free VA pay by 25%
+  const pay=Math.max(0,Math.min(G*.28,G*.41-debtPay)),pi=pay*.75,loan=pi*(1-Math.pow(1+r,-n))/r;
+  const H=P.home;let eq=0;if(H){const mb=mortgage(H,i,1).bal[0];eq=Math.max(0,homeVal(H,i)*.93-mb);}
+  return{G,pay,loan,eq,total:loan+eq};}
+function vDream(){const D=dreamState(),R=calcResult(),P=S.plan,tile=(l,b,s)=>`<div class="tile"><div class="eyebrow-s">${l}</div><div class="tbig">${b}</div><div class="small muted">${s}</div></div>`,c=k=>`var(--s${k})`;
+  const p1=dreamCost([1]),all=dreamCost([1,2,3]);
+  let h=`<div class="stack"><h2>Dreams</h2><p class="muted">A wooded property of a few acres with a barndominium, a heated 4-vehicle garage and workshop with a lift, an indoor CrossFit gym, a small hobby farm for 4 or 5 rescued farm animals, and solar as the main power. Costs are Minnesota ranges for 2026 from builder and installer guides; get local bids before you count on them.</p>
+   <div class="tiles">${tile('Phase 1: move in',`${fmtK(p1.lo)} to ${fmtK(p1.hi)}`,'land, site work, home and shop')}${tile('Everything',`${fmtK(all.lo)} to ${fmtK(all.hi)}`,'all three phases with design, permits and contingency')}${tile('Midpoint',fmtK(all.mid),'a planning number to aim at')}</div>
+   <div class="panel stack"><div class="eyebrow-s">Cost estimate</div>${[1,2,3,0].map(ph=>`${ph?`<h3 style="margin-top:6px">${DREAM_PH[ph]}</h3>`:''}${DREAM_ITEMS.filter(x=>x[1]===ph).map(([id,,n,l,hh,w])=>`<label class="pl-row ${D.on[id]?'':'off'}" style="cursor:pointer"><div class="row" style="gap:10px;align-items:flex-start"><input type="checkbox" data-dream="${id}" ${D.on[id]?'checked':''} style="margin-top:4px"><div><b>${esc(n)}</b><div class="small muted">${esc(w)}</div></div></div><span class="amt">${ph?`${fmtK(l)} to ${fmtK(hh)}`:''}</span></label>`).join('')}`).join('')}</div>`;
+  if(P&&P.budget){const INC=debtIncome(R),sim=simDebts(R,{strat:planView().dstrat||'aval',extra:planView().dextra||'half'},INC),n0=nowIdx(),xs=[],bp=[],eqs=[];let first=null,firstAll=null;
+    for(let y=0;y<=12;y++){const i=n0-n0%12+12+y*12,row=sim.rows.find(r=>r.i===i)||sim.rows[sim.rows.length-1],dp=row?sim.D.reduce((a,d,k)=>a+(row.bal[k]>0?d.pay:0),0):0,B=buyingPower(R,i,dp);xs.push(i);bp.push(B.total);eqs.push(B.eq);
+      if(first===null&&B.total>=p1.mid)first=i;if(firstAll===null&&B.total>=all.mid)firstAll=i;}
+    h+=`<div class="panel stack"><div class="eyebrow-s">When you could afford it</div>${lineChart('dreamaff',{xs,aria:'Buying power by year',tiplab:i=>String(Math.floor(i/12)),series:[{n:'What you could borrow plus home equity',v:bp,c:c(1),fill:true},{n:'Home equity after selling costs',v:eqs,c:c(3),dash:true},{n:'Phase 1 (midpoint)',v:xs.map(()=>p1.mid),c:c(4)},{n:'Everything (midpoint)',v:xs.map(()=>all.mid),c:c(2),dash:true}],marks:sim.free!==null?[{i:xs.find(x=>x>=sim.free)??-1,lab:'Debt free'}]:[]})}
+     <p class="small">${first!==null?`Phase 1 fits about <b>${ym(first)}</b>`:'Phase 1 does not fit in the next 12 years at these numbers'}${firstAll!==null?`, and everything about <b>${ym(firstAll)}</b>`:''}. This uses your Calculator switches (job, employer, retirement date), your Debt plan, and a ${D.rate}% 30-year loan with the house payment kept under 28% of gross pay and all debts under 41%. Lenders count tax-free VA pay as 25% more. With a VA rating of 10% or more, the VA home loan funding fee is waived and you can borrow with no down payment.</p>
+     <div class="seg">${['5.5','6.5','7.5'].map(v=>`<button class="btn sm ${D.rate===v?'on':''}" data-drate="${v}">${v}% loan</button>`).join('')}</div></div>`;}
+  h+=`<div class="panel stack"><div class="eyebrow-s">Property listings to look at</div><p class="small">Asking prices seen on 13 Oct 2026. Listings change daily, so open each link to check it is still for sale.</p>
+    ${DREAM_LIST.map(([n,d,pr,u,k])=>`<div class="pl-row ${k==='land'?'duty':'study'}"><div><a href="${esc(u)}" target="_blank" rel="noopener"><b>${esc(n)}</b></a><div class="small muted">${esc(d)} · ${k==='land'?'build everything new':'existing house, add the shop and gym'}</div></div><span class="amt">${money0(pr)}</span></div>`).join('')}
+    <div class="eyebrow-s" style="margin-top:6px">Search for more</div><div class="row" style="flex-wrap:wrap;gap:6px">${DREAM_SEARCH.map(([n,u])=>`<a class="btn sm" href="${esc(u)}" target="_blank" rel="noopener">${esc(n)}</a>`).join('')}</div>
+    <p class="small"><b>What to look for in a listing:</b> 5+ acres with a south-facing clearing for solar, zoning that allows farm animals (townships limit animal units per acre), soil that perks for septic, and a pole barn or outbuilding you could turn into the shop or gym. Raw wooded land is the cheapest way in; a property with an existing house or pole barn can save $100k or more of building.</p></div></div>`;
+  return h;}
+function bindDream(){bindCharts();const D=dreamState();
+  document.querySelectorAll('[data-dream]').forEach(c=>c.onchange=()=>{D.on[c.dataset.dream]=c.checked;save();render();});
+  document.querySelectorAll('[data-drate]').forEach(b=>b.onclick=()=>{D.rate=b.dataset.drate;save();render();});}
+
+/* ---------- Wishlist: projects on the current house (Twin Cities contractor prices, 2026) ---------- */
+const WISH_ITEMS=[ // [id, name, unit field, unit label, default size, low per unit, high per unit, fixed low, fixed high, value back at sale, why]
+ ['gutters','New seamless gutters','lf','feet of gutter',150,9,16,0,0,'High','Keeps water away from the foundation and the bare dirt under the porch. Do this first; it protects everything else.'],
+ ['paint','Interior painting, whole house','sqft','sq ft of house',1800,2.5,4.5,0,0,'High','Pro painters charge about $2.50 to $4.50 per sq ft of floor. Doing it yourself is about $1,000 of paint and supplies.'],
+ ['floor','New flooring (luxury vinyl plank)','sqft','sq ft of floor',1500,5,9,0,0,'High','Installed price with removal of old flooring. Carpet in bedrooms runs $3 to $6.'],
+ ['fence','Backyard privacy fence, 6 ft wood','lf','feet of fence',250,40,60,800,1500,'Medium','Wood privacy fence with one or two gates. Vinyl runs $45 to $70 a foot, chain link $20 to $35. Call 811 before digging and check Hastings fence rules.'],
+ ['prairie','Prairie grasses along the fence','sqft','sq ft of planting bed',1000,6,12,0,0,'Medium','Bed prep, native plugs and mulch put in by a landscaper; about $1 to $2 a sq ft if you plant it yourself. Minnesota\'s Lawns to Legumes program and Dakota County\'s Landscaping for Clean Water have small grants.'],
+ ['circuit','Add a 60 amp circuit to the garage','each','circuit',1,0,0,1500,3500,'Low','A 60 amp subpanel in an attached garage. Add $1,000 to $2,500 if it has to be trenched to a detached garage, or $2,500 to $4,500 if the main panel needs an upgrade. Needs an electrical permit.'],
+ ['insul','Insulate the garage (walls and ceiling)','sqft','sq ft of garage floor',576,8,15,0,0,'Low','Batts plus drywall or OSB on the walls and ceiling of a 2-car garage. An insulated door adds $1,500 to $3,000 and a heater $1,000 to $3,000.'],
+ ['patio','Under the porch: concrete patio or screened room','sqft','sq ft under the porch',192,25,60,0,0,'Medium','The cheapest fix for the bare dirt: grade it, pour a slab, and screen it in. Gives you a dry, usable space.'],
+ ['room','Under the porch: new 4-season room above grade','sqft','sq ft under the porch',192,275,425,0,0,'Medium','A true room on frost footings, heated and insulated, tied into the house. Needs a building permit and plans.'],
+ ['bsmt','Under the porch: extend the basement bedroom','sqft','sq ft under the porch',192,350,550,0,0,'Low','Dig out, pour foundation walls and floor, waterproof, add an egress window, and open the wall into the bedroom. The porch above usually has to be rebuilt. Needs a structural engineer.']];
+function wishState(){S.wish=Object.assign({size:{},on:{gutters:true,paint:true,floor:true,fence:true,prairie:true,circuit:true,insul:true,patio:true}},S.wish||{});return S.wish;}
+function wishCost(x){const W=wishState(),n=+(W.size[x[0]]??x[4]);return[n*x[5]+x[7],n*x[6]+x[8]];}
+function vWish(){const W=wishState(),P=S.plan,on=WISH_ITEMS.filter(x=>W.on[x[0]]),tot=on.reduce((a,x)=>{const [l,h]=wishCost(x);return[a[0]+l,a[1]+h];},[0,0]);
+  const tile=(l,b,s)=>`<div class="tile"><div class="eyebrow-s">${l}</div><div class="tbig">${b}</div><div class="small muted">${s}</div></div>`,c=k=>`var(--s${k})`;
+  const dream=dreamCost([1]);let first=null;
+  try{const R=calcResult(),INC=debtIncome(R),sim=simDebts(R,{strat:planView().dstrat||'aval',extra:planView().dextra||'half'},INC),n0=nowIdx();
+    for(let y=0;y<=12&&first===null;y++){const i=n0+y*12,row=sim.rows.find(r=>r.i===i)||sim.rows[sim.rows.length-1],dp=row?sim.D.reduce((a,d,k)=>a+(row.bal[k]>0?d.pay:0),0):0;if(buyingPower(R,i,dp).total>=dream.mid)first=i;}}catch(e){}
+  const yrs=first===null?99:(first-nowIdx())/12;
+  let h=`<div class="stack"><h2>Wishlist</h2><p class="muted">Projects on the house you live in now, with Twin Cities contractor prices for 2026. Change the sizes to match your house; the totals update. Get 3 bids for anything over $5,000.</p>
+   <div class="tiles">${tile('Selected projects',`${fmtK(tot[0])} to ${fmtK(tot[1])}`,`${on.length} projects checked`)}${tile('Dream move',first===null?'12+ years':`about ${Math.max(0,Math.round(yrs))} years`,first===null?'from the Dreams tab':`Phase 1 fits about ${ym(first)}`)}${tile('Home value',P&&P.home?money0(P.home.value):'—','county estimate')}</div>
+   <div class="panel stack"><div class="eyebrow-s">When to fix up this house</div><p class="small">${yrs<5?`Your dream move is less than 5 years out, so spend on what protects the house and helps it sell: <b>gutters, paint, flooring, and the fence</b>. Skip the room addition and basement extension; buyers usually pay back only half of them or less.`:`Your dream move is ${first===null?'more than 12':'about '+Math.round(yrs)} years out, so you will live here a while. Start with what protects the house and helps it sell (<b>gutters, paint, flooring, fence</b>), then add what you will enjoy for years (garage power and insulation, prairie beds). A new room under the porch makes sense only if you plan to stay 7 or more years.`} Pay cash after the cards are paid off rather than putting projects on credit.</p></div>
+   <div class="panel stack">${WISH_ITEMS.map(x=>{const [id,n,u,ul,def,,,,,val,why]=x,[l,hh]=wishCost(x),sz=W.size[id]??def;return `<div class="pl-row ${W.on[id]?'':'off'}"><div class="stack" style="gap:4px"><label class="row" style="gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" data-wish="${id}" ${W.on[id]?'checked':''} style="margin-top:4px"><span><b>${esc(n)}</b> <span class="chip ${val==='High'?'good':val==='Medium'?'warn':'plain'}">${val} resale value</span><div class="small muted">${esc(why)}</div></span></label>${u!=='each'?`<label class="row small" style="gap:6px;margin-left:28px"><input type="number" min="0" data-wsize="${id}" value="${esc(sz)}" style="width:90px"> ${esc(ul)}</label>`:''}</div><span class="amt">${fmtK(l)} to ${fmtK(hh)}</span></div>`;}).join('')}</div>
+   <div class="panel stack"><div class="eyebrow-s">Cost of each project (midpoint)</div>${hbars(on.map(x=>{const [l,hh]=wishCost(x);return{lab:x[1].replace(/\s*\(.*\)/,''),v:(l+hh)/2,c:x[9]==='High'?c(3):x[9]==='Medium'?c(4):'var(--ink-3)'};}).sort((a,b)=>b.v-a.v))}<p class="small">Green bars usually pay back the most when you sell. The three porch options are alternatives; pick one.</p></div></div>`;
+  return h;}
+function bindWish(){bindCharts();const W=wishState();
+  document.querySelectorAll('[data-wish]').forEach(c=>c.onchange=()=>{W.on[c.dataset.wish]=c.checked;save();render();});
+  document.querySelectorAll('[data-wsize]').forEach(el=>el.onchange=()=>{W.size[el.dataset.wsize]=Math.max(0,+el.value||0);save();render();});}
+
+const VIEWS={calc:[vCalc,()=>{bindCalc();bindCharts();}],debt:[vDebt,bindDebt],money:[vMoney,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup],dates:[vDates,bindDates],save:[vSave,bindSave],cal:[vCal,bindCal],spend:[vSpend,()=>bindCharts()],rw:[vRewards,bindRewards],dream:[vDream,bindDream],wish:[vWish,bindWish]};
 function render(){
   if(!VIEWS[S.tab])S.tab='dash';
   renderTabs();renderBanner();renderFileBar();const an=S.appName||'Claim Kit';$('#appName').textContent=an;document.title=an;
