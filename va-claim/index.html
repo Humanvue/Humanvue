@@ -39,7 +39,7 @@
   color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;margin:0}
-.wrap{max-width:960px;margin:0 auto;padding-inline:16px;padding-block:0 64px}
+.wrap{max-width:1440px;margin:0 auto;padding-inline:16px;padding-block:0 64px}
 h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:.01em;text-wrap:balance;margin:0}
 h1{font-size:2rem;line-height:1.05}
 h2{font-size:1.5rem;line-height:1.1}
@@ -197,13 +197,23 @@ details.panel>summary{cursor:pointer}
 @media (max-width:560px){.path-row{grid-template-columns:1fr auto}.path-row .path-bar{grid-column:1/-1;grid-row:2}}
 @media (max-width:560px){.calc-row{grid-template-columns:1fr 1fr}.calc-row>:first-child{grid-column:1/-1}.calc-row>:last-child:empty{display:none}}
 @media (prefers-reduced-motion:no-preference){.bar>span,.ring circle{transition:all .4s ease}}
+.calgrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}@media (max-width:900px){.calgrid{grid-template-columns:1fr}}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.cw{font:600 .7rem var(--f-mono);text-transform:uppercase;color:var(--ink-3);text-align:center;padding:2px 0}
+.cd{min-height:92px;border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:4px;display:flex;flex-direction:column;gap:2px;text-align:left;cursor:pointer;font:inherit;color:inherit;min-width:0;overflow:hidden}
+.cd.off{border:0;background:transparent;cursor:default}.cd.today{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}.cd.sel{background:var(--surface-2);outline:2px solid var(--study)}
+.cn{font:600 .8rem var(--f-mono);color:var(--ink-2)}.ci{font-size:.68rem;line-height:1.25;padding:1px 4px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ci.dep{background:var(--duty-bg);color:var(--duty-ink);font-weight:700}.ci.bill{background:var(--warn-bg);color:var(--warn)}.ci.dl.study{background:var(--study-bg);color:var(--study-ink)}.ci.dl.duty{border:1px dashed var(--duty);color:var(--duty-ink)}.ci.more{color:var(--ink-3)}
+@media (max-width:560px){.cd{min-height:58px}.ci{font-size:0;padding:0;height:6px;border-radius:3px}.ci.more{display:none}}
+.dot.warnd{background:var(--warn)}
+.rank{display:inline-grid;place-items:center;min-width:54px;height:54px;padding:0 8px;border-radius:12px;background:var(--duty);color:#fff;font:700 1rem var(--f-display);letter-spacing:.04em}.rank.big{min-width:76px;height:76px;font-size:1.3rem}
+.rwdays{display:grid;grid-template-columns:repeat(14,1fr);gap:4px}.rwday{height:28px;border-radius:6px;background:var(--surface-2);display:grid;place-items:center;font:600 .65rem var(--f-mono);color:var(--ink-3)}.rwday.half{background:var(--study-bg);color:var(--study-ink)}.rwday.on{background:var(--duty);color:#fff}
 </style>
 
 <div class="wrap">
   <header class="top">
     <div class="brand">
-      <div class="eyebrow">VA disability claim · private workbook</div>
-      <h1>Claim Kit</h1>
+      <div class="eyebrow">VA claim, retirement and money · private workbook</div>
+      <h1 id="appName">Claim Kit</h1>
     </div>
     <div class="legend small">
       <span class="chip duty"><span class="dot duty"></span>Duty side</span>
@@ -352,7 +362,7 @@ function progress(){
 }
 
 /* ---------- Tabs ---------- */
-const TABS=[['dash','Dashboard'],['steps','Steps'],['me','About me'],['conds','Conditions'],['scan','Scan records'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['dates','Deadlines'],['calc','Calculator'],['debt','Debt plan'],['money','Money charts'],['save','Savings & taxes'],['backup','Backup & help']];
+const TABS=[['dash','Dashboard'],['cal','Calendar'],['rw','Rewards'],['steps','Steps'],['me','About me'],['conds','Conditions'],['scan','Scan records'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['dates','Deadlines'],['calc','Calculator'],['debt','Debt plan'],['money','Money charts'],['save','Savings & taxes'],['spend','Spending'],['backup','Backup & help']];
 function renderTabs(){
   $('#tabs').innerHTML=TABS.map(([id,n])=>`<button role="tab" id="tab-${id}" aria-selected="${S.tab===id}" data-tab="${id}">${n}</button>`).join('');
 }
@@ -404,6 +414,7 @@ function vDash(){
   return `<div class="stack">
    <div class="panel"><div class="dash-head">${ring}<div class="stack" style="gap:8px">${chip}<h2>${esc(headline)}</h2>
    <dl class="kv"><dt>Steps done</dt><dd>${p.tasksDone} of ${TASKS.length}</dd><dt>Evidence points</dt><dd>${p.condPts} of ${p.condMax}</dd><dt>Documents marked final</dt><dd>${docsDone}</dd>${(()=>{const R=calcResult();return R.rows.some(r=>+r.pct>0)?`<dt>Estimated rating</dt><dd><button class="link" data-tab="calc">${R.rounded}% · ${money(R.pay)} a month</button></dd>`:''})()}${S.plan?(()=>{const X=planResult(calcResult());return `<dt>Retired take-home</dt><dd><button class="link" data-tab="calc">${money0(X.net)} a month · ${esc(X.O.label)}, ${JOBS[X.V.job].name}, ${CITY[X.V.city]}</button></dd>`;})():''}${S.claim.filed?`<dt>Filed</dt><dd>${fmt(parseDate(S.claim.filed))}</dd>`:''}</dl></div></div>${tl}</div>
+   ${rewardStrip()}
    ${dashDeadlines()}
    <div class="grid2">
     <div class="panel stack"><h3>Up next</h3>${nextHtml}</div>
@@ -1211,7 +1222,7 @@ function vDebt(){
   const payInv=simDebts(R,{strat:V.dstrat,extra:V.dextra,invest:true},INC),invInst=simDebts(R,{strat:'min',extra:'none',invest:true},INC);
   const firsts=P.debts.filter(d=>d.bal>0).map(d=>{const s=simDebts(R,{strat:'first',first:d.id,extra:V.dextra==='none'?'half':V.dextra},INC);return{d,s,saved:mins.totInt-s.totInt};}).sort((a,b)=>a.s.totInt-b.s.totInt||(a.s.free??9e9)-(b.s.free??9e9));
   const start=plan.start,end=Math.min(start+INC.length-1,Math.max(plan.free??start+INC.length-1,start+36)+6);
-  const col=k=>`var(--s${k+1})`,W=Math.round(Math.max(300,Math.min(640,(document.querySelector('#main')?.clientWidth||660)-58))),nar=W<480;
+  const col=k=>`var(--s${k+1})`,W=Math.round(Math.max(300,Math.min(1100,(document.querySelector('#main')?.clientWidth||660)-58))),nar=W<480;
   // decision points on the time line
   const rm=ymIdx(V.date.slice(0,7)),ev=[];
   (P.debtEvents||[]).forEach(e=>{const i=e.at==='retire'?rm:e.at==='retire+1'?rm+1:ymIdx(e.at);ev.push({i,side:e.side||'plain',t:e.title,x:e.text});});
@@ -1300,7 +1311,7 @@ function vDebt(){
    <p class="small muted">${esc(P.debtNote||'')}</p></details></div></div>`;
 }
 /* ---------- Money charts: planning, debt, investing, property tax (personal numbers come from S.plan) ---------- */
-const chW=()=>Math.round(Math.max(300,Math.min(640,(document.querySelector('#main')?.clientWidth||660)-58)));
+const chW=()=>Math.round(Math.max(300,Math.min(1100,(document.querySelector('#main')?.clientWidth||660)-58)));
 const pct0=v=>`${Math.round(v*100)}%`;
 function lineChart(key,o){ // o.xs: month numbers; o.series: [{n,v,c,dash,fill}]; o.marks: [{i,lab}]
   const w=chW(),nar=w<480,h=o.h||(nar?200:240),pad={t:14,r:12,b:26,l:o.yfmt?44:52},n=o.xs.length;
@@ -1590,10 +1601,161 @@ function printPacket(){const f=document.createElement('iframe');f.style.cssText=
   setTimeout(()=>{try{f.contentWindow.focus();f.contentWindow.print();}catch(e){toast('Printing is blocked here. Open the file in Chrome or Safari.');}setTimeout(()=>f.remove(),60000);},300);}
 document.addEventListener('click',e=>{if(e.target.closest('[data-print-packet]'))printPacket();});
 
-const VIEWS={calc:[vCalc,()=>{bindCalc();bindCharts();}],debt:[vDebt,bindDebt],money:[vMoney,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup],dates:[vDates,bindDates],save:[vSave,bindSave]};
+/* ---------- Bank transactions (imported from your bank's CSV export, kept only in this file) ---------- */
+function parseCSV(t){const rows=[];let row=[],f='',q=false;for(let i=0;i<t.length;i++){const c=t[i];
+  if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++;}else q=false;}else f+=c;}
+  else if(c==='"')q=true;else if(c===','){row.push(f);f='';}else if(c==='\n'||c==='\r'){if(c==='\r'&&t[i+1]==='\n')i++;row.push(f);rows.push(row);row=[];f='';}else f+=c;}
+  if(f||row.length){row.push(f);rows.push(row);}return rows.filter(r=>r.length>1);}
+function importCSV(text,acct){const R=parseCSV(text),h=R.shift().map(x=>x.trim().toLowerCase()),ix=n=>h.indexOf(n);
+  const di=ix('date'),ds=ix('description'),ca=ix('category'),am=ix('amount'),st=ix('status');if(di<0||am<0)throw new Error('This file has no Date and Amount columns.');
+  S.tx=S.tx||[];const seen=new Set(S.tx.map(t=>t.join('|')));let n=0;
+  R.forEach(r=>{if(st>=0&&/pending/i.test(r[st]))return;const t=[r[di].trim(),(r[ds]||'').trim(),(r[ca]||'').trim(),Math.round(parseFloat(r[am])*100)/100,acct];if(isNaN(t[3])||!/^\d{4}-\d\d-\d\d$/.test(t[0]))return;
+    const k=t.join('|');if(!seen.has(k)){seen.add(k);S.tx.push(t);n++;}});
+  S.tx.sort((a,b)=>a[0]<b[0]?-1:1);return n;}
+const txKey=d=>d.toUpperCase().replace(/[^A-Z ]/g,' ').replace(/\s+/g,' ').trim().split(' ').slice(0,2).join(' ');
+const EAT_OUT=/^(Food & Dining|Fast Food|Coffee Shops|Restaurants?|Alcohol & Bars)$/i,GROC=/^Groceries$/i,NOT_BILL=/^(Groceries|Fast Food|Food & Dining|Coffee Shops|Shopping|Gas|Transfer|Credit Card Payment Pending|Category Pending|Uncategorized|Home Improvement|Entertainment|Pharmacy|Auto & Transport)$/i;
+function txIsTransfer(t){return /transfer/i.test(t[2])||/TRANSFER|OVERDRAFT ADVANCE/i.test(t[1]);}
+function bills(){ // recurring payments found in your bank history, plus any fixes saved in S.plan.billFix
+  const T=S.tx||[],fix=(S.plan&&S.plan.billFix)||{},last=T.length?T[T.length-1][0]:'',g={};
+  T.forEach(t=>{if(t[3]>=0||txIsTransfer(t)||NOT_BILL.test(t[2]))return;const k=txKey(t[1]);(g[k]=g[k]||[]).push(t);});
+  const out=[];for(const [k,v] of Object.entries(g)){const mo=new Set(v.map(t=>t[0].slice(0,7))),F=fix[k]||{};
+    if(F.hide)continue;if(!F.due&&!F.name&&(mo.size<4||v.length>mo.size*1.3))continue;const lastT=v[v.length-1][0];
+    if(!F.due&&last&&(ymIdx(last.slice(0,7))-ymIdx(lastT.slice(0,7)))>1)continue;
+    const med=a=>{const s=a.slice().sort((x,y)=>x-y);return s[Math.floor(s.length/2)];};
+    out.push({k,name:F.name||v[v.length-1][1].replace(/\s+/g,' ').slice(0,26),day:F.due||med(v.map(t=>+t[0].slice(8))),amt:F.amt||med([...mo].map(x=>v.filter(t=>t[0].startsWith(x)).reduce((a,t)=>a-t[3],0))),cat:v[0][2],end:F.end||'',paidAround:!F.due,note:F.note||''});}
+  Object.entries(fix).forEach(([k,F])=>{if(F.add&&!out.some(b=>b.k===k))out.push({k,name:F.name,day:F.due,amt:F.amt,cat:F.cat||'Bill',end:F.end||'',paidAround:false,note:F.note||''});});
+  return out.sort((a,b)=>a.day-b.day);}
+
+/* ---------- Pay days: DFAS pays the 1st and 15th (the business day before if those fall on a weekend or holiday); USAA posts it 2 business days early ---------- */
+const HOL={};function holidays(y){if(HOL[y])return HOL[y];const s=new Set(),nth=(m,wd,n)=>{const d=new Date(y,m,1);let c=0;while(true){if(d.getDay()===wd&&++c===n)return new Date(d);d.setDate(d.getDate()+1);}},
+  lastMon=m=>{const d=new Date(y,m+1,0);while(d.getDay()!==1)d.setDate(d.getDate()-1);return d;},obs=d=>{const x=new Date(d);if(x.getDay()===6)x.setDate(x.getDate()-1);if(x.getDay()===0)x.setDate(x.getDate()+1);return x;};
+  [obs(new Date(y,0,1)),nth(0,1,3),nth(1,1,3),lastMon(4),obs(new Date(y,5,19)),obs(new Date(y,6,4)),nth(8,1,1),nth(9,1,2),obs(new Date(y,10,11)),nth(10,4,4),obs(new Date(y,11,25)),obs(new Date(y+1,0,1))].forEach(d=>s.add(dkey(d)));return HOL[y]=s;}
+const dkey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const isBiz=d=>d.getDay()%6!==0&&!holidays(d.getFullYear()).has(dkey(d));
+function backBiz(d,n){const x=new Date(d);while(!isBiz(x))x.setDate(x.getDate()-1);for(let k=0;k<n;k++){x.setDate(x.getDate()-1);while(!isBiz(x))x.setDate(x.getDate()-1);}return x;}
+function deposits(y,m){ // deposits expected in month m (0-11) of year y
+  const out=[],V=S.plan?planView():{},rm=S.plan?ymIdx(V.date.slice(0,7)):1e9,R=S.plan?calcResult():null,T=(S.tx||[]).filter(t=>t[3]>0&&/DEFENSE FINANCE/i.test(t[1]));
+  const last=T.slice(-4).map(t=>t[3]).sort((a,b)=>a-b),half=last.length?last[Math.floor(last.length/2)]:(S.plan?S.plan.budget.nowIncome/2:0);
+  const add=(pay,amt,lab,side)=>{const d=backBiz(pay,2);out.push({d:dkey(d),amt,lab,side,pay:dkey(backBiz(pay,0))});};
+  [[y,m,15],[y,m+1,1]].forEach(([yy,mm,dd])=>{const pay=new Date(yy,mm,dd),i=pay.getFullYear()*12+pay.getMonth()-(dd===1?1:0);
+    if(i<=rm)add(pay,half,'Army pay','duty');
+    else if(dd===1&&R){const X=planResult(R,{stage:'start'});add(pay,X.ret,'Army retired pay (before tax)','duty');if(i>rm)add(pay,X.va,'VA disability pay','duty');}});
+  return out.filter(x=>{const d=parseDate(x.d);return d.getFullYear()===y&&d.getMonth()===m;});}
+function monthItems(y,m){const days={},put=(k,o)=>{(days[k]=days[k]||[]).push(o);},B=bills(),mi=y*12+m,dim=new Date(y,m+1,0).getDate();
+  deposits(y,m).forEach(x=>put(x.d,Object.assign({kind:'dep'},x)));
+  B.forEach(b=>{if(b.end&&mi>ymIdx(b.end))return;const d=Math.min(b.day,dim);put(`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`,{kind:'bill',lab:b.name,amt:b.amt,b});});
+  try{const D=deadlines();D.mil.concat(D.sch).forEach(x=>{if(x.d.getFullYear()===y&&x.d.getMonth()===m)put(dkey(x.d),{kind:'dl',lab:x.t,side:x.side,done:x.done});});}catch(e){}
+  return days;}
+
+/* ---------- Meals: what eating out costs and what eating in would save ---------- */
+function mealStats(){const T=(S.tx||[]).filter(t=>t[3]<0&&!txIsTransfer(t));if(!T.length)return null;
+  const a=parseDate(T[0][0]),b=parseDate(T[T.length-1][0]),wk=Math.max(1,(b-a)/DAY/7);
+  const out=T.filter(t=>EAT_OUT.test(t[2])||/DOORDASH|UBER EATS|GRUBHUB/i.test(t[1])),gro=T.filter(t=>GROC.test(t[2])),sum=x=>x.reduce((s,t)=>s-t[3],0);
+  const dd=out.filter(t=>/DOORDASH|UBER EATS|GRUBHUB/i.test(t[1]));
+  return{wk,outW:sum(out)/wk,groW:sum(gro)/wk,ordersW:out.length/wk,avgOrder:sum(out)/Math.max(1,out.length),ddW:sum(dd)/wk,ddN:dd.length,outY:sum(out)/wk*52,groY:sum(gro)/wk*52};}
+const HOME_COST=.3; // a meal cooked at home costs about 30% of the same meal ordered out
+function weekPanel(sel){const M=mealStats(),V=S.calView=Object.assign({eatIn:'50'},S.calView||{}),d=parseDate(sel),mon=new Date(d);mon.setDate(d.getDate()-((d.getDay()+6)%7));
+  const days=[...Array(7)].map((_,k)=>{const x=new Date(mon);x.setDate(mon.getDate()+k);return x;}),items={};
+  days.forEach(x=>{const k=dkey(x);Object.assign(items,{[k]:(monthItems(x.getFullYear(),x.getMonth())[k]||[])});});
+  const all=Object.values(items).flat(),inc=all.filter(x=>x.kind==='dep').reduce((s,x)=>s+x.amt,0),out=all.filter(x=>x.kind==='bill').reduce((s,x)=>s+x.amt,0);
+  let h=`<div class="panel stack"><div class="eyebrow-s">Week of ${fmt(mon)}</div><dl class="kv"><dt>Money coming in</dt><dd class="pos">${money0(inc)}</dd><dt>Bills due</dt><dd class="neg">${money0(out)}</dd></dl>`;
+  h+=all.filter(x=>x.kind!=='dl').map(x=>`<div class="row small" style="justify-content:space-between"><span><span class="dot ${x.kind==='dep'?'duty':'warnd'}"></span> ${esc(x.lab)}</span><b>${x.kind==='dep'?'+':'−'}${money0(x.amt)}</b></div>`).join('')||'<p class="small muted">No deposits or bills this week.</p>';
+  h+='</div>';
+  if(M){const p=+V.eatIn/100,save=M.outW*p*(1-HOME_COST),toRet=Math.max(0,(S.plan?ymIdx(planView().date.slice(0,7)):nowIdx())-nowIdx())*52/12;
+    h+=`<div class="panel stack"><div class="eyebrow-s">Weekly meal budget</div>
+     <div class="tiles" style="grid-template-columns:1fr 1fr">${['Groceries',money0(M.groW+M.outW*p*HOME_COST),'Eating out',money0(M.outW*(1-p))].reduce((s,v,i,a)=>i%2?s:s+`<div class="tile"><div class="eyebrow-s">${a[i]}</div><div class="tbig">${a[i+1]}</div></div>`,'')}</div>
+     <div><div class="eyebrow-s">Eat in instead of out</div><div class="seg">${['25','50','75','100'].map(v=>`<button class="btn sm ${V.eatIn===v?'on':''}" data-eatin="${v}">${v}%</button>`).join('')}</div></div>
+     <div class="tile"><div class="eyebrow-s">You save</div><div class="tbig pos">${money0(save)}<span class="small"> a week</span></div><div class="small muted">${money0(save*52)} a year · ${money0(save*toRet)} by retirement</div></div>
+     <p class="small">Right now you spend about <b>${money0(M.outW)}</b> a week eating out (${M.ordersW.toFixed(1)} orders, ${money0(M.avgOrder)} each) and <b>${money0(M.groW)}</b> on groceries. A meal made at home costs about ${HOME_COST*100}% of the same meal ordered in.</p></div>`;}
+  else h+=`<div class="panel stack"><div class="eyebrow-s">Weekly meal budget</div><p class="small muted">Import your bank's CSV export (button above the calendar) to see your meal budget.</p></div>`;
+  return h;}
+function vCal(){const V=S.calView=Object.assign({eatIn:'50'},S.calView||{}),now=new Date(),ym0=V.ym||dkey(now).slice(0,7),[y,m]=ym0.split('-').map(Number),mo=m-1,sel=V.sel||dkey(now);
+  const items=monthItems(y,mo),first=new Date(y,mo,1),start=(first.getDay()+6)%7,dim=new Date(y,mo+1,0).getDate(),today=dkey(now);
+  let cells='';for(let k=0;k<start;k++)cells+='<div class="cd off"></div>';
+  for(let d=1;d<=dim;d++){const k=`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`,L=items[k]||[];
+    cells+=`<button class="cd ${k===today?'today':''} ${k===sel?'sel':''}" data-cday="${k}"><span class="cn">${d}</span>${L.slice(0,4).map(x=>`<span class="ci ${x.kind==='dep'?'dep':x.kind==='dl'?'dl '+x.side:'bill'}" title="${esc(x.lab)}">${x.kind==='dep'?'+'+fmtK(x.amt):x.kind==='bill'?esc(x.lab.replace(/\(.*\)/g,'').replace(', ',' ').trim()):esc(x.lab.slice(0,14))}</span>`).join('')}${L.length>4?`<span class="ci more">+${L.length-4}</span>`:''}</button>`;}
+  const dayL=items[sel]||[],dd=parseDate(sel);
+  const mi=y*12+mo,inc=Object.values(items).flat().filter(x=>x.kind==='dep').reduce((s,x)=>s+x.amt,0),bl=Object.values(items).flat().filter(x=>x.kind==='bill').reduce((s,x)=>s+x.amt,0);
+  return `<div class="stack"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><h2>Calendar</h2><span class="row"><label class="btn sm">Import bank CSV<input type="file" id="csvIn" accept=".csv,text/csv" multiple hidden></label><span class="small muted">${(S.tx||[]).length} transactions saved</span></span></div>
+   <div class="calgrid"><div class="stack">
+    <div class="panel stack"><div class="row" style="justify-content:space-between"><button class="btn sm" data-cmon="-1" aria-label="Previous month">‹</button><h3>${first.toLocaleDateString(undefined,{month:'long',year:'numeric'})}</h3><button class="btn sm" data-cmon="1" aria-label="Next month">›</button></div>
+     <div class="cal">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<div class="cw">${d}</div>`).join('')}${cells}</div>
+     <div class="legend"><span class="lg"><i style="background:var(--duty)"></i>Deposit</span><span class="lg"><i style="background:var(--warn)"></i>Bill due</span><span class="lg"><i style="background:var(--study)"></i>School deadline</span></div>
+     <dl class="kv"><dt>Coming in this month</dt><dd class="pos">${money0(inc)}</dd><dt>Bills this month</dt><dd class="neg">${money0(bl)}</dd><dt>Left for food, gas and everything else</dt><dd><b>${money0(inc-bl)}</b></dd></dl></div>
+    <div class="panel stack"><div class="eyebrow-s">${fmt(dd)}</div>${dayL.length?dayL.map(x=>`<div class="pl-row ${x.kind==='dep'?'duty':x.kind==='dl'?x.side:''}"><div><b>${esc(x.lab)}</b><div class="small muted">${x.kind==='dep'?`Paid ${fmt(parseDate(x.pay))}; USAA posts it 2 business days early (holidays can shift it a day)`:x.kind==='bill'?(x.b.paidAround?`You usually pay this around the ${x.b.day}${['th','st','nd','rd'][x.b.day%10>3||[11,12,13].includes(x.b.day)?0:x.b.day%10]}`:'Due date')+(x.b.note?'. '+esc(x.b.note):''):'Deadline'}</div></div><span class="amt">${x.amt!=null?(x.kind==='dep'?'+':'−')+money(x.amt):''}</span></div>`).join(''):'<p class="small muted">Nothing on this day.</p>'}</div>
+    <details class="panel"><summary><b>All bills</b> <span class="small muted">(${bills().length}, found in your bank history)</span></summary><div class="stack" style="margin-top:8px">${bills().map(b=>`<div class="pl-row"><div>${esc(b.name)}<div class="small muted">${esc(b.cat)} · ${b.paidAround?'paid around':'due'} day ${b.day}${b.end?` · ends ${esc(b.end)}`:''}</div></div><span class="amt">${money(b.amt)}</span></div>`).join('')}</div></details>
+   </div><div class="stack">${weekPanel(sel)}</div></div></div>`;}
+function bindCal(){const V=S.calView;
+  document.querySelectorAll('[data-cday]').forEach(b=>b.onclick=()=>{V.sel=b.dataset.cday;save(true);render();});
+  document.querySelectorAll('[data-cmon]').forEach(b=>b.onclick=()=>{const [y,m]=(V.ym||dkey(new Date()).slice(0,7)).split('-').map(Number),d=new Date(y,m-1+ +b.dataset.cmon,1);V.ym=dkey(d).slice(0,7);V.sel=dkey(d);save(true);render();});
+  document.querySelectorAll('[data-eatin]').forEach(b=>b.onclick=()=>{V.eatIn=b.dataset.eatin;save();render();});
+  const f=$('#csvIn');if(f)f.onchange=async()=>{let n=0;try{for(const file of f.files)n+=importCSV(await file.text(),file.name.replace(/\.csv$/i,''));save();render();toast(`Added ${n} new transactions`);}catch(e){toast(e.message);}};}
+
+/* ---------- Spending insights ---------- */
+function vSpend(){const T=(S.tx||[]).filter(t=>!txIsTransfer(t));if(!T.length)return `<div class="panel stack"><h2>Spending</h2><p class="muted">Import your bank's CSV export on the Calendar tab to see your spending patterns.</p></div>`;
+  const out=T.filter(t=>t[3]<0),sum=x=>x.reduce((s,t)=>s-t[3],0),c=k=>`var(--s${k})`,card=(t,b,n)=>`<div class="panel stack"><div class="eyebrow-s">${t}</div>${b}${n?`<p class="small">${n}</p>`:''}</div>`;
+  const group=t=>EAT_OUT.test(t[2])||/DOORDASH/i.test(t[1])?'Eating out':GROC.test(t[2])?'Groceries':/Mortgage|Auto Payment|Financial|Credit Card/i.test(t[2])?'Housing and debt':/Utilities|Television|Bills/i.test(t[2])?'Bills and utilities':/Shopping|Electronics|Home Improvement/i.test(t[2])?'Shopping':'Other';
+  const G=['Housing and debt','Bills and utilities','Eating out','Groceries','Shopping','Other'],col={['Housing and debt']:c(1),['Bills and utilities']:c(7),['Eating out']:c(2),Groceries:c(3),Shopping:c(5),Other:'var(--ink-3)'};
+  const months=[...new Set(out.map(t=>t[0].slice(0,7)))].sort().slice(-12);
+  let h=`<div class="stack"><h2>Spending</h2><p class="muted">From ${(S.tx||[]).length} bank transactions, ${fmt(parseDate(T[0][0]))} to ${fmt(parseDate(T[T.length-1][0]))}. Transfers between your own accounts are left out.</p>`;
+  const M=mealStats(),fees=out.filter(t=>/FEE|OVERDRAFT|LATE|INTEREST CHARGE/i.test(t[1])&&!/INSTALLMENT/i.test(t[1])),amz=out.filter(t=>/AMAZON|AMZN/i.test(t[1])&&!/DIGITAL|PRIME/i.test(t[1]));
+  const wd=[0,0,0,0,0,0,0];out.filter(t=>group(t)==='Eating out').forEach(t=>wd[(parseDate(t[0]).getDay()+6)%7]+=-t[3]);const wdn=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],top=wd.indexOf(Math.max(...wd));
+  const subs=bills().filter(b=>b.amt<60&&/Software|Television|Music|Entertainment|Bills/i.test(b.cat));
+  const ins=[];if(M)ins.push(`Eating out costs about <b>${money0(M.outY)}</b> a year, ${pct0(M.outY/(M.outY+M.groY))} of all your food money. ${M.ddN?`DoorDash alone was ${M.ddN} orders.`:''}`);
+  ins.push(!wd[5]&&!wd[6]&&top===0?`Monday is your biggest eating-out day (${money0(wd[0])}). Your bank posts weekend orders on Monday, so most of that is Friday night to Sunday. Planning weekend meals ahead is the easiest win.`:`You eat out most on <b>${wdn[top]}s</b> (${money0(wd[top])} over the period). Planning a ${wdn[top]} meal ahead is the easiest win.`);
+  if(fees.length)ins.push(`Bank fees and late fees: <b>${money0(sum(fees))}</b> (${fees.length} charges). Autopay and a small cushion in checking stop these.`);
+  if(amz.length)ins.push(`Amazon: <b>${amz.length} orders</b>, ${money0(sum(amz))}. A 48-hour wait before buying cuts impulse orders.`);
+  if(subs.length)ins.push(`Subscriptions: ${subs.map(b=>esc(b.name)).join(', ')} add up to <b>${money0(subs.reduce((s,b)=>s+b.amt,0)*12)}</b> a year.`);
+  h+=`<div class="panel stack"><div class="eyebrow-s">What stands out</div><ul class="small stack" style="gap:6px;margin:0;padding-left:18px">${ins.map(x=>`<li>${x}</li>`).join('')}</ul></div>`;
+  h+=card('Spending by month',vbars(months.map(mn=>({lab:MON[+mn.slice(5)-1],segs:G.map(g=>[g,sum(out.filter(t=>t[0].startsWith(mn)&&group(t)===g)),col[g]])})),{aria:'Spending by month'}),'Hover a bar to see each part.');
+  const cats={};out.forEach(t=>{const k=t[2]||'Other';cats[k]=(cats[k]||0)-t[3];});
+  h+=card('Where it went, by category',hbars(Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,v],q)=>({lab:k,v,c:c(q%7+1),tip:`${k}: ${money0(v)}`}))),'');
+  const mer={};out.filter(t=>group(t)==='Eating out'||/AMAZON/i.test(t[1])).forEach(t=>{const k=txKey(t[1]);mer[k]=mer[k]||[0,0];mer[k][0]+=-t[3];mer[k][1]++;});
+  h+=card('Top places for food and shopping',hbars(Object.entries(mer).sort((a,b)=>b[1][0]-a[1][0]).slice(0,8).map(([k,v],q)=>({lab:k.replace(/\b\w/g,s=>s).toLowerCase().replace(/(^|\s)\w/g,s=>s.toUpperCase()),v:v[0],c:c(2),txt:`${money0(v[0])} · ${v[1]}×`}))),'');
+  h+=card('Eating out by day of the week',hbars(wd.map((v,i)=>({lab:wdn[i],v,c:i===top?c(2):'var(--ink-3)'}))),!wd[5]&&!wd[6]?'Dates are the day the bank posted each charge, so weekend orders show up on Monday.':'');
+  return h+'</div>';}
+
+/* ---------- Rewards: points for daily and weekly habits, with streak multipliers ---------- */
+const RW_DAILY=[['home','Ate at home all day: no delivery or fast food',20],['cook','Cooked a meal',10],['lunch','Packed lunch for duty or clinicals',10],['nospend','No-spend day: only bills and gas',15],['plan','15 minutes on the claim or retirement plan',15],['save','Moved money into savings or paid extra on a debt',25]];
+const RW_WEEKLY=[['meal','Stayed under my weekly meal budget',100],['bills','Paid every bill on time this week',75],['review','Looked over this week\'s calendar and spending',40]];
+const RANKS=[[0,'PVT'],[300,'PFC'],[800,'SPC'],[1600,'SGT'],[2800,'SSG'],[4500,'SFC'],[7000,'MSG'],[10000,'1SG'],[14000,'SGM'],[19000,'CSM'],[25000,'Retired with honors']];
+const streakMult=n=>n>=30?3:n>=14?2:n>=7?1.5:n>=3?1.25:1;
+const wkKey=d=>{const x=new Date(d);x.setDate(x.getDate()-((x.getDay()+6)%7));return dkey(x);};
+function rewards(){const W=S.rw=Object.assign({days:{},weeks:{}},S.rw||{}),keys=Object.keys(W.days).sort();let pts=0,streak=0,prev=null,best=0;const log=[];
+  keys.forEach(k=>{const d=W.days[k],n=RW_DAILY.filter(a=>d[a[0]]).length;if(n<2){streak=0;prev=k;return;}
+    const pd=prev&&parseDate(prev),cur=parseDate(k);streak=pd&&Math.round((cur-pd)/DAY)===1&&streak>0?streak+1:1;prev=k;best=Math.max(best,streak);
+    const base=RW_DAILY.reduce((s,a)=>s+(d[a[0]]?a[2]:0),0),mult=streakMult(streak),p=Math.round(base*mult);pts+=p;log.push([k,p,mult]);});
+  const today=dkey(new Date()),y=new Date();y.setDate(y.getDate()-1);
+  const live=W.days[dkey(y)]&&RW_DAILY.filter(a=>W.days[dkey(y)][a[0]]).length>=2||(W.days[today]&&RW_DAILY.filter(a=>W.days[today][a[0]]).length>=2)?streak:0;
+  let wk=0;Object.entries(W.weeks).forEach(([k,w])=>{const act=Object.keys(W.days).filter(d=>wkKey(parseDate(d))===k&&RW_DAILY.filter(a=>W.days[d][a[0]]).length>=2).length,m=act>=5?2:1;wk+=Math.round(RW_WEEKLY.reduce((s,a)=>s+(w[a[0]]?a[2]:0),0)*m);});
+  const auto=TASKS.filter(t=>S.tasks[t.id]).length*50+(S.dl?Object.values(S.dl).filter(Boolean).length*40:0)+((S.sv&&S.sv.hist)||[]).length*25+S.conditions.reduce((a,c)=>a+condScore(c),0)*10;
+  const total=pts+wk+auto,ri=RANKS.filter(r=>total>=r[0]).length-1,next=RANKS[ri+1];
+  return{W,total,pts,wk,auto,streak:live,best,mult:streakMult(live),rank:RANKS[ri][1],next,pct:next?(total-RANKS[ri][0])/(next[0]-RANKS[ri][0]):1,log};}
+function rewardStrip(){const r=rewards();return `<div class="panel row rwstrip" style="justify-content:space-between;flex-wrap:wrap"><span class="row" style="gap:14px"><span class="rank">${esc(r.rank)}</span><span><b>${r.total.toLocaleString()} points</b><div class="small muted">${r.streak?`${r.streak}-day streak · ×${r.mult} on daily points`:'Check off 2 habits today to start a streak'}</div></span></span><button class="btn sm" data-tab="rw">Today's habits</button></div>`;}
+function vRewards(){const r=rewards(),W=r.W,today=dkey(new Date()),d=W.days[today]=W.days[today]||{},wk=wkKey(new Date()),w=W.weeks[wk]=W.weeks[wk]||{};
+  const actWk=Object.keys(W.days).filter(k=>wkKey(parseDate(k))===wk&&RW_DAILY.filter(a=>W.days[k][a[0]]).length>=2).length;
+  const todayBase=RW_DAILY.reduce((s,a)=>s+(d[a[0]]?a[2]:0),0),nextMult=[[3,1.25],[7,1.5],[14,2],[30,3]].find(([n])=>r.streak<n);
+  const days14=[...Array(14)].map((_,k)=>{const x=new Date();x.setDate(x.getDate()-13+k);const kk=dkey(x),n=W.days[kk]?RW_DAILY.filter(a=>W.days[kk][a[0]]).length:0;return `<div class="rwday ${n>=2?'on':n?'half':''}" title="${fmt(x)}: ${n} habits"><span>${'MTWTFSS'[(x.getDay()+6)%7]}</span></div>`;}).join('');
+  return `<div class="stack"><h2>Rewards</h2>
+   <div class="panel stack"><div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:12px"><div class="row" style="gap:14px"><span class="rank big">${esc(r.rank)}</span><div><div class="tbig">${r.total.toLocaleString()}</div><div class="small muted">points${r.next?` · ${(r.next[0]-r.total).toLocaleString()} to ${esc(r.next[1])}`:''}</div></div></div>
+    <div class="tiles" style="flex:1;min-width:260px;grid-template-columns:repeat(3,1fr)"><div class="tile"><div class="eyebrow-s">Streak</div><div class="tbig">${r.streak}</div><div class="small muted">days · best ${r.best}</div></div><div class="tile"><div class="eyebrow-s">Daily multiplier</div><div class="tbig">×${r.mult}</div><div class="small muted">${nextMult?`×${nextMult[1]} at ${nextMult[0]} days`:'top multiplier'}</div></div><div class="tile"><div class="eyebrow-s">This week</div><div class="tbig">${actWk}/5</div><div class="small muted">good days for the ×2 weekly bonus</div></div></div></div>
+    <div class="path-bar"><div class="fill work" style="width:${Math.round(r.pct*100)}%"></div></div><div class="rwdays">${days14}</div></div>
+   <div class="grid2"><div class="panel stack"><div class="eyebrow-s">Today · ${fmt(new Date())} · ${todayBase} points × ${streakMult(r.streak+(RW_DAILY.filter(a=>d[a[0]]).length>=2&&!r.streak?1:0))}</div>
+     ${RW_DAILY.map(([k,t,p])=>`<label class="task study ${d[k]?'done':''}"><input type="checkbox" data-rwd="${k}" ${d[k]?'checked':''}><div class="row" style="justify-content:space-between;flex:1"><span>${esc(t)}</span><b>+${p}</b></div></label>`).join('')}
+     <p class="small muted">Two or more habits make it a good day and keep your streak. Streaks multiply your daily points: ×1.25 at 3 days, ×1.5 at 7, ×2 at 14, ×3 at 30.</p></div>
+    <div class="panel stack"><div class="eyebrow-s">This week</div>
+     ${RW_WEEKLY.map(([k,t,p])=>`<label class="task duty ${w[k]?'done':''}"><input type="checkbox" data-rww="${k}" ${w[k]?'checked':''}><div class="row" style="justify-content:space-between;flex:1"><span>${esc(t)}</span><b>+${p}</b></div></label>`).join('')}
+     <p class="small muted">Five good days in a week doubles these weekly points.</p>
+     <div class="eyebrow-s">Earned automatically</div><dl class="kv"><dt>Claim steps done</dt><dd>${TASKS.filter(t=>S.tasks[t.id]).length} × 50</dd><dt>Deadlines checked off</dt><dd>${S.dl?Object.values(S.dl).filter(Boolean).length:0} × 40</dd><dt>Balances logged</dt><dd>${((S.sv&&S.sv.hist)||[]).length} × 25</dd><dt>Evidence points</dt><dd>${S.conditions.reduce((a,c)=>a+condScore(c),0)} × 10</dd></dl></div></div>
+   <div class="panel stack"><div class="eyebrow-s">Ranks</div><div class="row" style="flex-wrap:wrap;gap:6px">${RANKS.map(([p,n])=>`<span class="chip ${r.total>=p?'duty':'plain'}">${esc(n)} · ${p.toLocaleString()}</span>`).join('')}</div></div></div>`;}
+function bindRewards(){const W=S.rw,today=dkey(new Date()),wk=wkKey(new Date());
+  document.querySelectorAll('[data-rwd]').forEach(c=>c.onchange=()=>{W.days[today][c.dataset.rwd]=c.checked;save();render();if(c.checked)toast('Nice work');});
+  document.querySelectorAll('[data-rww]').forEach(c=>c.onchange=()=>{W.weeks[wk][c.dataset.rww]=c.checked;save();render();});}
+
+const VIEWS={calc:[vCalc,()=>{bindCalc();bindCharts();}],debt:[vDebt,bindDebt],money:[vMoney,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup],dates:[vDates,bindDates],save:[vSave,bindSave],cal:[vCal,bindCal],spend:[vSpend,()=>bindCharts()],rw:[vRewards,bindRewards]};
 function render(){
   if(!VIEWS[S.tab])S.tab='dash';
-  renderTabs();renderBanner();renderFileBar();
+  renderTabs();renderBanner();renderFileBar();const an=S.appName||'Claim Kit';$('#appName').textContent=an;document.title=an;
   const [v,b]=VIEWS[S.tab];
   try{$('#main').innerHTML=`<section class="view" role="tabpanel" aria-labelledby="tab-${S.tab}">${v()}</section>`;b();}
   catch(e){console.error(e);const bad=S.tab;
