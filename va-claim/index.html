@@ -1116,6 +1116,11 @@ function dnpMonths(R){ // month-by-month budget while in the DNP program
   });
   rows.loanTotal=loanTotal;rows.stTotal=stTotal;rows.feeTotal=feeTotal;rows.fees=FE;return rows;
 }
+function dnpCoursePlan(D){const C=D.coursePlan;if(!C||!C.terms)return '';const tot=C.terms.reduce((a,t)=>a+t.c.reduce((s,x)=>s+x[2],0),0);
+  return `<div class="stack"><div class="eyebrow-s">Course plan by semester</div>${C.intro?`<p class="small">${esc(C.intro)}</p>`:''}
+   ${C.terms.map((t,i)=>{const cr=t.c.reduce((s,x)=>s+x[2],0);return `<div class="pl-row study"><div style="flex:1;min-width:0"><b>Semester ${i+1}: ${esc(t.t)}</b> <span class="small muted">${esc(t.d||'')}</span>
+     <ul class="small" style="margin:4px 0 0 18px;padding:0">${t.c.map(([code,name,c,cl])=>`<li><b>${esc(code)}</b> ${esc(name)}, ${c} cr${cl?` · <span style="color:var(--study)">${esc(cl)}</span>`:''}</li>`).join('')}</ul>${t.note?`<div class="small muted" style="margin-top:4px">${esc(t.note)}</div>`:''}</div><span class="amt">${cr} credits</span></div>`;}).join('')}
+   <div class="pl-row tot"><b>Credits in this plan</b><span class="amt">${tot}</span></div>${C.notes?`<ul class="small">${C.notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul>`:''}</div>`;}
 function vDnp(R){
   const P=S.plan,D=P.dnp,V=planView();if(!D||!P.budget)return'';
   const rows=dnpMonths(R),FE=rows.fees,total=D.terms.reduce((a,c)=>a+c,0)*D.perCredit*(1-D.discount);
@@ -1138,6 +1143,7 @@ function vDnp(R){
    ${D.stateAid?`<div><div class="eyebrow-s">${esc(D.stateAid.name)}</div>${seg('mngi',[['on','Use it'],['off','Leave out']])}<p class="small">${V.pay==='vre'?esc(D.stateAid.vreNote):`${esc(D.stateAid.about)} In this view it covers ${money0(rows.stTotal)} of tuition and fees.`}</p></div>`:''}
    <p class="small">${V.pay==='loan'?`Graduate Direct Unsubsidized loans cover up to ${money0(D.loanAnnual)} a year (${money0(D.loanLimit)} lifetime). Grad PLUS loans end for new borrowers on 1 Jul 2026. You would borrow about ${money0(rows.loanTotal)}, then pay about ${money0(loanPay)} a month for 10 years at ${(D.loanRate*100).toFixed(1)}%, or use the income-based Repayment Assistance Plan.`:V.pay==='vre'?`If VA approves you for Veteran Readiness and Employment (VR&amp;E, Chapter 31), it pays tuition, fees and books straight to the school and pays you about ${money0(D.vreSub)} a month while you are enrolled full time. You need a rating of 20% or more and a counselor who agrees the DNP is part of your employment plan, so this is not guaranteed. ${esc(D.vreNote||'')}`:'Tuition, fees and books come out of take-home pay each month of the term.'}</p>
    <div class="tbl-wrap"><table class="mtbl"><thead><tr><th>Month</th><th>Take-home</th><th>Spending</th><th>Tuition</th><th>Fees &amp; books</th>${stCol?`<th>${esc(D.stateAid.short)}</th>`:''}<th>${V.pay==='vre'?'VR&amp;E':'Loan'}</th><th>Left over</th></tr></thead><tbody>${body}</tbody></table></div>
+   ${dnpCoursePlan(D)}
    ${D.scholarships?`<div class="stack"><div class="eyebrow-s">Scholarships and loan help to apply for</div><ul class="small">${D.scholarships.map(x=>`<li><b>${esc(x.name)}</b>: ${esc(x.what)}${x.when?` <span class="muted">${esc(x.when)}</span>`:''}</li>`).join('')}</ul></div>`:''}
    <p class="small muted">${esc((D.notes||'').replace(/^Tuition only; fees, books and travel to clinical sites are extra\./,'Fees and books above are from Herzing\'s published fee schedule; travel to clinical sites is extra.'))}</p></div>`;
 }
