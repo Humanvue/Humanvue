@@ -1,0 +1,19 @@
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}.grid3>*{min-width:0}
+.goodbox{background:color-mix(in srgb,var(--good) 14%,transparent);border-left:4px solid var(--good);padding:8px 10px;border-radius:6px}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+input[type=number]{font:400 .95rem var(--f-body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;width:100%}
+input[type=range]{accent-color:var(--accent);width:100%}
+.panel.duty,.tile.duty{border-left:4px solid var(--duty)}.panel.study,.tile.study{border-left:4px solid var(--study)}.panel.money,.tile.money{border-left:4px solid var(--accent)}
+.mtbl td.num{text-align:right}
+.gbar details.more{flex-basis:100%;border-left-color:var(--accent)}.gbar details.more summary{cursor:pointer}.gbar .gbar.in{border:0;padding:6px 0 0;margin:0;background:none}
+.gbar .g-money{border-left-color:var(--accent)}
+.viz.tl{user-select:none;touch-action:none;cursor:grab}.viz.tl:active{cursor:grabbing}
+.viz .mklab{font:600 11px var(--f-body);paint-order:stroke;stroke:var(--surface);stroke-width:3px}
+.viz .mk{cursor:pointer}
+.tl-legend{display:flex;flex-direction:column;gap:6px}.lgrow{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
+.lgb{font:500 .78rem var(--f-body);background:none;border:1px solid transparent;border-radius:6px;padding:2px 6px;color:var(--ink-2);cursor:pointer}.lgb:hover{border-color:var(--line)}
+.lgb i,.lg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}.lgb.off{opacity:.4;text-decoration:line-through}
+.tip hr{border:0;border-top:1px solid var(--line);margin:4px 0}.tip{max-width:320px}
+.kd{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.kdb{text-align:left;display:flex;flex-direction:column;gap:2px;padding:8px 10px;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;background:var(--surface-2);color:var(--ink);font:inherit;cursor:pointer}
+.kdb.duty{border-left-color:var(--duty)}.kdb.study{border-left-color:var(--study)}.kdb.age{border-left-color:var(--ink-3)}.kdb .mono{font-size:.75rem;color:var(--ink-3)}
