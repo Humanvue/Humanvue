@@ -1018,11 +1018,10 @@ function vPlan(R){
   const X=planResult(R,AL?({job:AL.job,stage:AL.stage,sal:AL.sal,yrs:AL.yrs,cola:AL.cola,infl:AL.infl,debtCut:cut}):undefined),V=X.V,B=X.P.budget;
   const seg=(key,opts)=>`<div class="seg" role="group">${opts.map(([v,n])=>`<button class="btn sm ${V[key]===v?'on':''}" data-pv="${key}" data-val="${v}" aria-pressed="${V[key]===v}">${n}</button>`).join('')}</div>`;
   const line=r=>`<div class="pl-row ${r.side||''}"><div><b>${esc(r.k)}</b><div class="small muted">${esc(r.note)}</div></div><div class="amt">${money0(r.v)}<div class="small muted yr-amt">${money0(r.v*12)}/yr</div></div></div>`;
-  const other=Object.keys(X.P.options).filter(d=>d!==V.date).map(d=>planResult(R,{date:d}))[0];
+  const others=Object.keys(X.P.options).filter(d=>d!==V.date).sort().map(d=>planResult(R,{date:d}));
   const J=V.emp==='va'?VA_PAY[V.job]:JOBS[V.job].cities[V.city];
   // lifetime difference between the two dates, to age 85
   const yrs=85-(new Date(V.date).getFullYear()+(new Date(V.date).getMonth()+1)/12-+X.P.born.slice(0,4)-(+X.P.born.slice(5,7))/12);
-  const diff=other?X.ret-other.ret:0;
   const path=planPath(R),maxV=Math.max(...path.map(p=>Math.max(p.net,p.spend)))*1.05;
   const pathRows=path.map(p=>`<div class="path-row"><div class="small"><b>${esc(p.what)}</b><br><span class="muted">${esc(p.when)}</span></div>
      <div class="path-bar" aria-hidden="true"><span class="fill ${p.V.stage==='retired'?'ret':'work'}" style="width:${(p.net/maxV*100).toFixed(1)}%"></span>${B?`<span class="tick" style="left:${(p.spend/maxV*100).toFixed(1)}%"></span>`:''}</div>
@@ -1054,7 +1053,7 @@ function vPlan(R){
    ${vVaJob(R)}
    ${vDnp(R)}
    ${X.P.unions&&V.emp!=='va'?`<div class="panel-in stack"><div class="eyebrow-s">Nurse unions, ${CITY[V.city]}</div><ul class="small">${X.P.unions[V.city].map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`:''}
-   <p class="small"><b>Retire date.</b> ${esc(X.O.note)}${other?` Retiring ${esc(other.O.label)} instead pays ${money0(other.ret)} a month${diff?`, so this choice is worth about ${money0(Math.abs(diff)*12*Math.max(0,yrs))} ${diff>0?'more':'less'} by age 85`:''}.`:''}</p>
+   <p class="small"><b>Retire date.</b> ${esc(X.O.note)}${others.map(o=>{const diff=X.ret-o.ret;return ` Retiring ${esc(o.O.label)} instead pays ${money0(o.ret)} a month${diff?`, so this choice is worth about ${money0(Math.abs(diff)*12*Math.max(0,yrs))} ${diff>0?'more':'less'} by age 85`:''}.`;}).join('')}</p>
    <p class="small"><b>Pay source.</b> ${esc(J.src)}${V.job==='np'?' PMHNP pay starts after the DNP, so plan on RN pay until you finish it.':''}</p>
    <p class="small"><b>Concurrent receipt.</b> ${X.crdp?'At 50% or more you get full retired pay and full VA pay (CRDP).':'Under 50%, VA pay is taken out of retired pay, but the VA part is tax free. At 50% you would get both in full (CRDP).'} Combat-Related Special Compensation can also pay both for Iraq-related conditions.${X.vaPct>=70?` At ${X.vaPct}% you also qualify for Minnesota's homestead exclusion of $${X.vaPct>=100?'300,000':'150,000'} of your home's value, which cuts your property tax.`:''}</p>
    <details><summary class="small"><b>Other money to plan for</b></summary><ul class="small">${X.P.extras.map(t=>`<li>${esc(t)}</li>`).join('')}<li>Survivor Benefit Plan: not needed while you are single. If you marry, you can elect it within the first year.</li></ul></details>
@@ -1470,7 +1469,7 @@ function bindCharts(){
     svg.querySelectorAll('[data-tip]').forEach(m=>{const sh=ev=>{const r=wr.getBoundingClientRect();tip.textContent=m.dataset.tip;tip.hidden=false;tip.style.left=Math.min(Math.max(0,ev.clientX-r.left+10),r.width-tip.offsetWidth)+'px';tip.style.top=Math.max(0,ev.clientY-r.top-40)+'px';};
       m.addEventListener('pointermove',sh);m.addEventListener('pointerdown',sh);m.addEventListener('pointerleave',()=>tip.hidden=true);});});
 }
-function bindPlan(){bindAsOf();document.querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{planView()[b.dataset.pv]=b.dataset.val;save();render();});
+function bindPlan(){bindAsOf();document.querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{planView()[b.dataset.pv]=b.dataset.val;if(b.dataset.pv==='date'&&S.profile&&(S.profile.sepType||'Retirement')==='Retirement')S.profile.sep=b.dataset.val;save();render();});
   document.querySelectorAll('[data-poff]').forEach(c=>c.onchange=()=>{const o=offSet();if(c.checked)delete o[c.dataset.poff];else o[c.dataset.poff]=true;save();render();});}
 
 /* ---------- Deadlines: leaving the military (counted from your separation date) and nursing school ---------- */
