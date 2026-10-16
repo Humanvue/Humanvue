@@ -413,7 +413,7 @@ function vDash(){
   const docsDone=Object.values(S.docDone).filter(Boolean).length;
   return `<div class="stack">
    <div class="panel"><div class="dash-head">${ring}<div class="stack" style="gap:8px">${chip}<h2>${esc(headline)}</h2>
-   <dl class="kv"><dt>Steps done</dt><dd>${p.tasksDone} of ${TASKS.length}</dd><dt>Evidence points</dt><dd>${p.condPts} of ${p.condMax}</dd><dt>Documents marked final</dt><dd>${docsDone}</dd>${(()=>{const R=calcResult();return R.rows.some(r=>+r.pct>0)?`<dt>Estimated rating</dt><dd><button class="link" data-tab="calc">${R.rounded}% · ${money(R.pay)} a month</button></dd>`:''})()}${S.plan?(()=>{const X=planResult(calcResult());return `<dt>Retired take-home</dt><dd><button class="link" data-tab="calc">${money0(X.net)} a month · ${esc(X.O.label)}, ${JOBS[X.V.job].name}, ${CITY[X.V.city]}</button></dd>`;})():''}${S.claim.filed?`<dt>Filed</dt><dd>${fmt(parseDate(S.claim.filed))}</dd>`:''}</dl></div></div>${tl}</div>
+   <dl class="kv"><dt>Steps done</dt><dd>${p.tasksDone} of ${TASKS.length}</dd><dt>Evidence points</dt><dd>${p.condPts} of ${p.condMax}</dd><dt>Documents marked final</dt><dd>${docsDone}</dd>${(()=>{const R=calcResult();return R.rows.some(r=>+r.pct>0)?`<dt>Estimated rating</dt><dd><button class="link" data-tab="calc">${R.rounded}% · ${money(R.pay)} a month</button></dd>`:''})()}${S.plan?(()=>{const X=planResult(calcResult());return `<dt>Retired take-home</dt><dd><button class="link" data-tab="calc">${money0(X.net)} a month · ${esc(X.O.label)}, ${JOBS[X.V.job].name}${X.V.job==='np'?` from ${ym(ymIdx(S.plan.npStart||'2030-07'))}`:''}, ${CITY[X.V.city]}</button></dd>`;})():''}${S.claim.filed?`<dt>Filed</dt><dd>${fmt(parseDate(S.claim.filed))}</dd>`:''}</dl></div></div>${tl}</div>
    ${rewardStrip()}
    ${dashDeadlines()}
    <div class="grid2">
@@ -1006,8 +1006,9 @@ function planResult(R,over){
 }
 function planPath(R){ // phases of your career, using the selected date, job, city and VA view
   const V=planView(),np=V.job==='np',P=S.plan;
-  const ph=[['Oct 2027 to 2028','RN, first year',{job:'rn',stage:'start'}],['2028 to 2030','RN, experienced'+(np?', DNP school':''),{job:'rn',stage:'exp'}]];
-  if(np)ph.push(['2030 to 2049','PMHNP, DNP',{job:'np',stage:'exp'}]);else ph[1][0]='2028 to 2049';
+  const r0=ymIdx(V.date.slice(0,7))+1,y1=Math.floor(r0/12)+1,npY=+(P.npStart||'2030-07').slice(0,4),endY=+P.fra.replace(/^\w+ /,'');
+  const ph=[[`${ym(r0)} to ${y1}`,'RN, first year',{job:'rn',stage:'start'}],[`${y1} to ${npY}`,'RN, experienced'+(np?', DNP school':''),{job:'rn',stage:'exp'}]];
+  if(np)ph.push([`${npY} to ${endY}`,'PMHNP, DNP',{job:'np',stage:'exp'}]);else ph[1][0]=`${y1} to ${endY}`;
   ph.push([P.fra.replace(/^\w+ /,'')+' on','Fully retired',{stage:'retired'}]);
   return ph.map(([when,what,o])=>Object.assign({when,what},planResult(R,o)));
 }
@@ -1016,10 +1017,12 @@ function vPlan(R){
   const AI=asOfI(),AL0=AI!==null?lifeAt(AI):null,AL=AL0&&AL0.agr?Object.assign(lifeAt(ymIdx(planView().date.slice(0,7))+1),{agr:true}):AL0;let cut=0;
   if(AL&&S.plan.debts&&S.plan.budget){const V0=planView(),sim=simDebts(R,{strat:V0.dstrat||'aval',extra:V0.dextra||'half'},debtIncome(R));cut=sim.D.filter(d=>d.end!==null&&d.end<=AI).reduce((a,d)=>a+d.pay,0);}
   const X=planResult(R,AL?({job:AL.job,stage:AL.stage,sal:AL.sal,yrs:AL.yrs,cola:AL.cola,infl:AL.infl,debtCut:cut}):undefined),V=X.V,B=X.P.budget;
-  const seg=(key,opts)=>`<div class="seg" role="group">${opts.map(([v,n])=>`<button class="btn sm ${V[key]===v?'on':''}" data-pv="${key}" data-val="${v}" aria-pressed="${V[key]===v}">${n}</button>`).join('')}</div>`;
+  const seg=(key,opts)=>segBtns(planView(),key,opts); // buttons show your choice, even when the month shown is still before PMHNP pay starts
   const line=r=>`<div class="pl-row ${r.side||''}"><div><b>${esc(r.k)}</b><div class="small muted">${esc(r.note)}</div></div><div class="amt">${money0(r.v)}<div class="small muted yr-amt">${money0(r.v*12)}/yr</div></div></div>`;
   const others=Object.keys(X.P.options).filter(d=>d!==V.date).sort().map(d=>planResult(R,{date:d}));
   const J=V.emp==='va'?VA_PAY[V.job]:JOBS[V.job].cities[V.city];
+  const npI=ymIdx(X.P.npStart||'2030-07'),seeI=AL?(AL.agr?ymIdx(V.date.slice(0,7))+1:AI):null,dO=seeI!==null?dnpOut(R):{},inSch=seeI in dO,dOut=dO[seeI]||0;
+  const npNote=planView().job==='np'&&seeI!==null&&seeI<npI?`<p class="small warnbox">You picked PMHNP. On ${ym(seeI)} you are still an RN${inSch?' in DNP school':' finishing the DNP and boards'}, so this shows RN pay. PMHNP pay starts about ${ym(npI)}.${inSch?dOut>0?` That month the DNP costs about ${money0(dOut)} out of pocket, which the Debt plan and Money tabs count.`:' Aid covers the DNP costs that month.':''} <button class="btn sm" data-asof="${idxYM(npI)}">Show ${ym(npI)}</button></p>`:'';
   // lifetime difference between the two dates, to age 85
   const yrs=85-(new Date(V.date).getFullYear()+(new Date(V.date).getMonth()+1)/12-+X.P.born.slice(0,4)-(+X.P.born.slice(5,7))/12);
   const path=planPath(R),maxV=Math.max(...path.map(p=>Math.max(p.net,p.spend)))*1.05;
@@ -1042,9 +1045,10 @@ function vPlan(R){
     ${V.stage==='retired'?`<div><div class="eyebrow-s">Start Social Security at</div>${seg('ss',[['62','62'],['67','67'],['70','70']])}</div>`:''}
    </div>
    ${asOfBar()}
+   ${npNote}
    ${AL&&AL.agr?`<p class="small warnbox">On ${ym(AI)} you are still on AGR orders, taking home about ${money0(X.P.budget?X.P.budget.nowIncome:0)} a month. The numbers below are for your first nursing job after AGR.</p>`:''}
    ${AL&&cut?`<p class="small">By ${ym(AI)} the Debt plan has paid off debts with ${money0(cut)} a month of payments, so spending below is that much lower.</p>`:''}
-   <div class="calc-head"><div><div class="eyebrow-s">Take-home a month${AL?` on ${ym(AI)}`:''}</div><div class="big">${money0(X.net)}</div><div class="small muted">${money0(X.net*12)} a year after tax and health costs</div></div>
+   <div class="calc-head"><div><div class="eyebrow-s">Take-home a month${AL?` on ${ym(AI)}`:V.job==='np'&&V.stage!=='retired'?`, ${V.stage==='exp'?'experienced':'first year'} PMHNP (from about ${ym(npI)})`:''}</div><div class="big">${money0(X.net)}</div><div class="small muted">${money0(X.net*12)} a year after tax and health costs</div></div>
     ${B?`<div><div class="eyebrow-s">Left over after spending</div><div class="big ${X.left>=0?'pos':'neg'}" style="font-size:2rem">${X.left>=0?'':'−'}${money0(Math.abs(X.left))}</div><div class="small muted">${X.left>=0?'':'−'}${money0(Math.abs(X.left*12))} a year, ${V.debt==='paid'?'with debts paid off':'with today\'s debt payments'}</div></div>`:''}</div>
    <div class="pl-list"><div class="eyebrow-s">Income</div>${X.L.map(line).join('')}<div class="eyebrow-s" style="margin-top:10px">Taxes and costs</div>${X.out.map(line).join('')}</div>
    ${bud}
@@ -1132,6 +1136,7 @@ function vDnp(R){
   const Y=byYear[last];body+=`<tr class="yr"><td>${last} total (${Y.n} mo)</td><td>${f(Y.take)}</td><td>${f(Y.spend)}</td><td>${f(Y.tuition)}</td><td>${f(Y.fee)}</td>${stCol?`<td>${f(Y.st)}</td>`:''}<td>${f(Y.aid)}</td><td>${sg(Y.left)}</td></tr>`;
   const loanPay=rows.loanTotal?Math.round(rows.loanTotal*(D.loanRate/12)/(1-Math.pow(1+D.loanRate/12,-120))):0;
   return `<div class="panel-in stack"><div class="eyebrow-s">DNP school, month by month</div>
+   <p class="small ${V.job==='np'?'':'warnbox'}">${V.job==='np'?'You picked PMHNP, so what you pay for school (and any loan payments after it) comes out of take-home in the Debt plan, Money, Dreams and Wish list tabs.':'You picked BSN RN, so the rest of the app leaves these DNP costs out. Pick PMHNP above to count them.'}</p>
    <p class="small"><b>${esc(D.school)}, ${esc(D.program)}.</b> ${esc(D.summary)}</p>
    <dl class="kv"><dt>Tuition</dt><dd>${D.credits} credits at ${money0(D.perCredit)} = ${money0(D.credits*D.perCredit)}</dd><dt>${esc(D.transferName||'Transfer credits')}</dt><dd>−${D.transfer} credits (${money0(D.transfer*D.perCredit)})</dd><dt>${esc(D.discountName)}</dt><dd>−${Math.round(D.discount*100)}% (${money0((D.credits-D.transfer)*D.perCredit*D.discount)})</dd><dt>Tuition you pay</dt><dd><b>${money0(total)}</b> over ${D.terms.length} terms</dd>
    ${FE.items.map(x=>`<dt>${esc(x.k)}</dt><dd>${money0(x.v)} a term × ${D.terms.length} = ${money0(x.v*D.terms.length)}${x.note?`<div class="small muted">${esc(x.note)}</div>`:''}</dd>`).join('')}
@@ -1168,10 +1173,16 @@ function lifeAt(i){ // what you are doing in month i under the current switches,
   if(i>=full)return{stage:'retired',job:V.job,label:'Fully retired, Social Security from '+V.ss,cola:f,infl:f};
   const job=V.job==='np'&&i>=npI?'np':'rn',st=job==='np'?Math.max(npI,rm+1):rm+1,yrs=Math.floor((i-st)/12);
   return{job,stage:yrs<1?'start':'exp',yrs,sal:Math.round(payPath(job,V.emp,yrs+1,Math.floor(st/12))[yrs]),cola:f,infl:f,label:`${job==='np'?'PMHNP':'RN'}, year ${yrs+1}${V.emp==='va'?' at the VA':''}`};}
-function debtIncome(R){ // take-home for each month of the plan, from the same toggles as the calculator
-  const P=S.plan,start=ymIdx(P.debtStart),cache={};
-  return Array.from({length:DEBT_YEARS*12},(_,t)=>{const i=start+t,L=lifeAt(i);if(L.agr)return P.budget.nowIncome;
-    const k=[L.job,L.stage,L.sal,Math.round(L.cola*200)].join();return cache[k]??=planResult(R,{job:L.job,stage:L.stage,sal:L.sal,yrs:L.yrs,cola:L.cola}).net;});
+function dnpOut(R){ // DNP school cash out of pocket by month index, only on the PMHNP path (VR&E's housing money shows as negative)
+  const o={};if(planView().job!=='np'||!S.plan.dnp)return o;
+  const rows=dnpMonths(R),D=S.plan.dnp;rows.forEach(r=>{o[r.y*12+r.m]=r.tuition+r.fee-r.st-r.aid;});
+  if(rows.loanTotal&&rows.length){const pay=rows.loanTotal*(D.loanRate/12)/(1-Math.pow(1+D.loanRate/12,-120)),last=rows[rows.length-1],s0=last.y*12+last.m+7; // federal loans: 6-month grace, then 10 years
+    for(let k=0;k<120;k++)o[s0+k]=(o[s0+k]||0)+pay;}
+  return o;}
+function debtIncome(R){ // take-home for each month of the plan, from the same toggles as the calculator, minus DNP school costs on the PMHNP path
+  const P=S.plan,start=ymIdx(P.debtStart),cache={},dn=dnpOut(R);
+  return Array.from({length:DEBT_YEARS*12},(_,t)=>{const i=start+t,L=lifeAt(i),d=dn[i]||0;if(L.agr)return P.budget.nowIncome-d;
+    const k=[L.job,L.stage,L.sal,Math.round(L.cola*200)].join();return (cache[k]??=planResult(R,{job:L.job,stage:L.stage,sal:L.sal,yrs:L.yrs,cola:L.cola}).net)-d;});
 }
 function asOfBar(){ // pick a date to see every number as of then
   const V=planView(),n0=nowIdx(),i=asOfI(),k=i===null?0:Math.max(0,i-n0),rm=ymIdx(V.date.slice(0,7))+1,L=i===null?null:lifeAt(i);
