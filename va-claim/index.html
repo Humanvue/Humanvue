@@ -303,7 +303,7 @@ let S;
 /* ---------- Keeping data: browser storage plus a copy saved inside this HTML file ---------- */
 function embedded(){try{const el=document.getElementById('ckdata');const o=el&&JSON.parse(el.textContent);return o&&Array.isArray(o.conditions)?o:null;}catch(e){return null;}}
 function load(){let loc=null;try{const raw=localStorage.getItem(KEY);if(raw)loc=JSON.parse(raw);}catch(e){}
-  const emb=embedded(),pick=loc&&emb?((loc.savedAt||0)>=(emb.savedAt||0)?loc:emb):loc||emb;
+  const emb=embedded(),pick=loc&&emb?((emb.rev||0)>(loc.rev||0)?emb:(loc.rev||0)>(emb.rev||0)?loc:(+loc.savedAt||0)>=(+emb.savedAt||0)?loc:emb):loc||emb;
   S=pick?Object.assign(blankState(),pick):exampleState();FILE.savedAt=emb?emb.savedAt||1:0;}
 const FILE={handle:null,savedAt:0,busy:false,timer:null};
 function fileCopy(){const json=JSON.stringify(S).replace(/</g,'\\u003c');
