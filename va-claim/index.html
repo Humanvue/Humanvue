@@ -56,6 +56,10 @@ p{margin:0}
 header.top{padding-block:20px 12px;display:flex;flex-wrap:wrap;gap:12px;align-items:end;justify-content:space-between}
 .brand .eyebrow{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
 .legend{display:flex;gap:8px;flex-wrap:wrap}
+.gbar{display:flex;flex-wrap:wrap;gap:8px 18px;padding:10px 12px;margin-bottom:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.gbar .g{display:flex;flex-direction:column;gap:4px;padding-left:8px;border-left:3px solid var(--line)}
+.gbar .g-duty{border-left-color:var(--duty)}.gbar .g-study{border-left-color:var(--study)}
+.gbar .seg .btn{padding:3px 9px}
 nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px}
 nav.tabs button{font:600 .95rem var(--f-display);letter-spacing:.06em;text-transform:uppercase;background:none;border:0;color:var(--ink-2);padding:12px 10px 10px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
 nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
@@ -362,7 +366,7 @@ function progress(){
 }
 
 /* ---------- Tabs ---------- */
-const TABS=[['dash','Dashboard'],['cal','Calendar'],['rw','Rewards'],['steps','Steps'],['me','About me'],['conds','Conditions'],['scan','Scan records'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['dates','Deadlines'],['calc','Calculator'],['debt','Debt plan'],['money','Money charts'],['save','Savings & taxes'],['spend','Spending'],['dream','Dreams'],['wish','Wishlist'],['backup','Backup & help']];
+const TABS=[['dash','Dashboard'],['cal','Calendar'],['rw','Rewards'],['steps','Steps'],['me','About me'],['conds','Conditions'],['scan','Scan records'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['dates','Deadlines'],['calc','Calculator'],['debt','Debt plan'],['money','Money charts'],['save','Savings & taxes'],['credit','Credit score'],['spend','Spending'],['wish','Wishlist'],['backup','Backup & help']];
 function renderTabs(){
   $('#tabs').innerHTML=TABS.map(([id,n])=>`<button role="tab" id="tab-${id}" aria-selected="${S.tab===id}" data-tab="${id}">${n}</button>`).join('');
 }
@@ -731,6 +735,7 @@ function bindDocs(){
 
 function vBackup(){
   return `<div class="stack">
+  <div class="panel stack"><h3>Archived tabs</h3><p class="small">These are hidden from the tab bar. Nothing in them was erased.</p><div class="row"><button class="btn" data-tab="dream">Open Dreams</button></div></div>
   <div class="panel stack"><h2>Your data stays here</h2><p>Nothing is uploaded, and this app never submits anything to VA. Everything you type is kept in this browser, and <b>Save to file</b> (at the top) writes it inside this HTML file, so opening the file brings it all back even if the browser forgets. In Chrome or Edge, pick this same file once and every change saves into it. In Safari, Save to file puts a new copy in Downloads; replace the old file with it. A copied backup is a second safety net.</p>
    <div class="row"><button class="btn primary" id="copyBackup">Copy backup</button><button class="btn" id="showImport">Restore from backup</button><span id="wipeWrap"><button class="btn danger" id="wipe">Erase everything</button></span></div>
    <div id="importBox" hidden class="stack"><label class="f">Paste a backup, or pick a backup file<textarea id="importText"></textarea></label><input type="file" id="importFile" accept=".json,.txt,application/json,text/plain"><div class="row"><button class="btn primary" id="doImport">Restore</button></div><p id="importMsg" class="small"></p></div>
@@ -1036,11 +1041,6 @@ function vPlan(R){
      <p class="small">Today you take home about ${money0(B.nowIncome)} a month and spend ${money0(B.nowSpend)}, so you are short about ${money0(B.nowSpend-B.nowIncome)} a month. ${esc(B.tip)}</p></div>`:'';
   return `<div class="panel stack"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3>Retirement income planner</h3><span class="small muted">Monthly, in today's dollars</span></div>
    <div class="stack" style="gap:8px">
-    <div><div class="eyebrow-s">Retire from AGR</div>${seg('date',Object.entries(X.P.options).map(([d,o])=>[d,o.label]))}</div>
-    <div><div class="eyebrow-s">Nursing job</div>${seg('job',[['rn','BSN RN'],['np','PMHNP, DNP']])}</div>
-    <div><div class="eyebrow-s">Employer</div>${seg('emp',[['civ','Hospital or clinic'],['va','The VA']])}</div>
-    ${V.emp==='va'?'':`<div><div class="eyebrow-s">City</div>${seg('city',[['tc','Twin Cities'],['roch','Rochester']])}</div>`}
-    <div><div class="eyebrow-s">VA rating</div>${seg('va',[['est',`My estimate (${R.rounded}%)`],['70','70%'],['100','100%']])}</div>
     ${AL?'':`<div><div class="eyebrow-s">Stage</div>${seg('stage',[['start','First year working'],['exp','Experienced'],['retired','Fully retired']])}</div>`}
     ${V.stage==='retired'?`<div><div class="eyebrow-s">Start Social Security at</div>${seg('ss',[['62','62'],['67','67'],['70','70']])}</div>`:''}
    </div>
@@ -1289,13 +1289,8 @@ function vDebt(){
   const evList=evIn.map((e,n)=>`<li class="ev ${e.side}"><span class="evb">${n+1}</span><div><b>${ym(e.i)}: ${esc(e.t)}</b><div class="small">${esc(e.x)}</div></div></li>`).join('');
   const tbl=P.debts.map((d,k)=>`<tr><td>${esc(d.name)}${d.est?' <span class="muted small">(estimate)</span>':''}</td><td>${money0(d.bal)}</td><td>${(d.apr*100).toFixed(2)}%</td><td>${money0(d.pay)}</td><td>${mins.D[k].end!==null?ym(mins.D[k].end):'later'}</td><td>${plan.D[k].end!==null?ym(plan.D[k].end):'later'}</td><td>${money0(plan.D[k].int)}</td></tr>`).join('');
   return `<div class="stack"><div class="panel stack"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3>Debt plan</h3><span class="small muted">Starts ${ym(start)}, monthly</span></div>
-   <p class="small">These toggles are shared with the Calculator tab, so a change here changes both.</p>
+   <p class="small">The buttons at the top of the page are shared by every tab, so a change here changes them all.</p>
    <div class="stack" style="gap:8px">
-    <div><div class="eyebrow-s">Retire from AGR</div>${segBtns(V,'date',Object.entries(P.options).map(([d,o])=>[d,o.label]))}</div>
-    <div><div class="eyebrow-s">Nursing job</div>${segBtns(V,'job',[['rn','BSN RN'],['np','PMHNP, DNP']])}</div>
-    <div><div class="eyebrow-s">Employer</div>${segBtns(V,'emp',[['civ','Hospital or clinic'],['va','The VA']])}</div>
-    ${V.emp==='va'?'':`<div><div class="eyebrow-s">City</div>${segBtns(V,'city',[['tc','Twin Cities'],['roch','Rochester']])}</div>`}
-    <div><div class="eyebrow-s">VA rating</div>${segBtns(V,'va',[['est',`My estimate (${R.rounded}%)`],['70','70%'],['100','100%']])}</div>
     <div><div class="eyebrow-s">Payoff order</div>${segBtns(V,'dstrat',[['aval','Highest rate first'],['snow','Smallest balance first'],['min','Minimums only']])}</div>
     ${V.dstrat==='min'?'':`<div><div class="eyebrow-s">Extra toward debt</div>${segBtns(V,'dextra',[['none','None'],['half','Half of what is left over'],['all','All of what is left over']])}</div>`}
    </div>
@@ -1467,10 +1462,9 @@ function vMoney(){
   }
   return `<div class="stack">${moneyHead(V)}${out}</div>`;
 }
-function moneyHead(V){const P=S.plan;return `<div class="panel stack"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3>Money charts</h3><span class="small muted">Uses the same switches as the Calculator and Debt plan</span></div>
+function moneyHead(V){const P=S.plan;return `<div class="panel stack"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3>Money charts</h3><span class="small muted">Uses the buttons at the top, shared by every tab</span></div>
   ${segBtns(V,'msec',[['plan','Planning'],['debt','Debt'],['invest','Investing'],['home','Property tax']])}
-  ${asOfBar()}
-  <div class="row" style="gap:8px;flex-wrap:wrap"><div><div class="eyebrow-s">Retire from AGR</div>${segBtns(V,'date',Object.entries(P.options).map(([d,o])=>[d,o.label]))}</div><div><div class="eyebrow-s">Nursing job</div>${segBtns(V,'job',[['rn','BSN RN'],['np','PMHNP']])}</div><div><div class="eyebrow-s">Employer</div>${segBtns(V,'emp',[['civ','Hospital'],['va','The VA']])}</div></div></div>`;}
+  ${asOfBar()}</div>`;}
 function bindDebt(){bindPlan();bindCharts();}
 function bindCharts(){
   document.querySelectorAll('.chart-wrap').forEach(wr=>{const tip=wr.querySelector('.tip'),svg=wr.querySelector('svg'),C=CHARTS[wr.dataset.chart];
@@ -1483,7 +1477,7 @@ function bindCharts(){
     svg.querySelectorAll('[data-tip]').forEach(m=>{const sh=ev=>{const r=wr.getBoundingClientRect();tip.textContent=m.dataset.tip;tip.hidden=false;tip.style.left=Math.min(Math.max(0,ev.clientX-r.left+10),r.width-tip.offsetWidth)+'px';tip.style.top=Math.max(0,ev.clientY-r.top-40)+'px';};
       m.addEventListener('pointermove',sh);m.addEventListener('pointerdown',sh);m.addEventListener('pointerleave',()=>tip.hidden=true);});});
 }
-function bindPlan(){bindAsOf();document.querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{planView()[b.dataset.pv]=b.dataset.val;if(b.dataset.pv==='date'&&S.profile&&(S.profile.sepType||'Retirement')==='Retirement')S.profile.sep=b.dataset.val;save();render();});
+function bindPlan(){bindAsOf();document.querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>pvClick(b));
   document.querySelectorAll('[data-poff]').forEach(c=>c.onchange=()=>{const o=offSet();if(c.checked)delete o[c.dataset.poff];else o[c.dataset.poff]=true;save();render();});}
 
 /* ---------- Deadlines: leaving the military (counted from your separation date) and nursing school ---------- */
@@ -1936,12 +1930,93 @@ function bindWish(){bindCharts();const W=wishState();
   document.querySelectorAll('[data-wish]').forEach(c=>c.onchange=()=>{W.on[c.dataset.wish]=c.checked;save();render();});
   document.querySelectorAll('[data-wsize]').forEach(el=>el.onchange=()=>{W.size[el.dataset.wsize]=Math.max(0,+el.value||0);save();render();});}
 
-const VIEWS={calc:[vCalc,()=>{bindCalc();bindCharts();}],debt:[vDebt,bindDebt],money:[vMoney,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup],dates:[vDates,bindDates],save:[vSave,bindSave],cal:[vCal,bindCal],spend:[vSpend,()=>bindCharts()],rw:[vRewards,bindRewards],dream:[vDream,bindDream],wish:[vWish,bindWish]};
+
+/* ---------- Credit score: what to do and when, from the same switches as the rest of the app ---------- */
+function crState(){S.credit=Object.assign({log:[]},S.credit||{});return S.credit;}
+function vCredit(){
+  const P=S.plan,C=crState();if(!P||!P.debts||!P.budget)return `<div class="panel stack"><h2>Credit score</h2><p class="muted">Restore your backup (Backup & help) to load your debts.</p></div>`;
+  const V=planView(),R=calcResult(),INC=debtIncome(R),sim=simDebts(R,{strat:V.dstrat||'aval',extra:V.dextra||'half'},INC),start=sim.start,n0=nowIdx();
+  const PC=P.credit||{},lim=PC.limits||{},cards=P.debts.map((d,k)=>({d,k,lim:lim[d.id]})).filter(x=>x.lim!==undefined);
+  const known=cards.filter(x=>x.lim),limSum=known.reduce((a,x)=>a+x.lim,0);
+  const util=r=>limSum?known.reduce((a,x)=>a+r.bal[x.k],0)/limSum:null;
+  const r0=sim.rows[0],u0=r0?util(r0):null;
+  const when=f=>{const r=sim.rows.find(f);return r?r.i:null;};
+  const u30=limSum?when(r=>util(r)<.3):null,u10=limSum?when(r=>util(r)<.1):null;
+  const tile=(l,b,sub)=>`<div class="tile"><div class="eyebrow-s">${l}</div><div class="tbig">${b}</div><div class="small muted">${sub}</div></div>`;
+  const last=C.log.length?C.log[C.log.length-1]:null;
+  const rm=ymIdx(V.date.slice(0,7)),retI=rm+1,np=V.job==='np',dO=dnpOut(R);
+  const loanStart=np&&V.pay==='loan'?(()=>{const D=P.dnp,rows=dnpMonths(R);if(!rows.loanTotal)return null;const l=rows[rows.length-1];return l.y*12+l.m+7;})():null;
+  const veh=P.debts.map((d,k)=>({d,k})).filter(x=>/loan/i.test(x.d.name)&&x.d.apr>=.08&&x.d.bal>20000);
+  let dream=null;try{const dc=dreamCost([1]);for(let y=0;y<=12&&dream===null;y++){const i=n0+y*12,row=sim.rows.find(r=>r.i===i)||sim.rows[sim.rows.length-1],dp=row?sim.D.reduce((a,d,k)=>a+(row.bal[k]>0?d.pay:0),0):0;if(buyingPower(R,i,dp).total>=dc.mid)dream=i;}}catch(e){}
+  const vaPct=V.va==='est'?R.rounded:+V.va;
+  // dated steps
+  const T=[];const add=(i,side,t,x)=>T.push({i,side,t,x});
+  add(n0,'plain','Put every bill on autopay',`Payment history is 35% of a FICO score. Set at least the minimum to autopay on every card and loan. ${PC.history?esc(PC.history):'A payment is usually only reported late once it is 30 days past due.'}`);
+  if(u0!==null&&u0>=.9)add(n0,'plain','Get the cards under their limits first',`Your cards are at ${pct0(u0)} of their limits. Over-limit or maxed cards hurt the most. Paying the balance down before the statement date is the fastest score gain you can make.`);
+  add(n0,'plain','Pay before the statement closes','Card companies report the balance on your statement. Paying part of it a few days before the closing date makes the reported balance lower, even if you pay the same amount each month.');
+  add(n0,'duty','Use your free military credit monitoring','While you serve, Equifax, Experian and TransUnion each give free credit monitoring to active-duty and National Guard members. Also pull all three free reports at annualcreditreport.com, and dispute anything wrong.');
+  if(u30)add(u30,'plain','Card use falls under 30%','Scores often jump when card balances drop under 30% of the limits. Don’t open new cards around now; let the lower balance show for two statements.');
+  if(u10)add(u10,'plain','Card use falls under 10%','The best scores usually show 1% to 9% use. Keep a small charge on one card (a streaming bill on autopay) so it stays active.');
+  known.concat(cards.filter(x=>!x.lim)).forEach(x=>{const e=sim.D[x.k].end;if(e)add(e,'plain',`${x.d.short||x.d.name} paid off: keep it open`,'Closing a paid-off card lowers your total limit and, over time, the age of your accounts. Keep it open with a small autopay charge. Ask for a limit increase once the balance has been at $0 for 6 months, as long as they use a soft pull.');});
+  veh.forEach(x=>{const e=sim.D[x.k].end,at=u30||n0+6;if(!e||e-at>18)add(at,'plain',`Shop a refinance for the ${x.d.short||x.d.name}`,`At ${(x.d.apr*100).toFixed(1)}% it is worth checking credit unions (USAA, Navy Federal, PenFed) once your cards are under 30%. Do all your applications within 14 days so they count as one inquiry.`);});
+  add(rm-6,'duty','Six months before you retire: no new credit','Avoid new cards or loans in the months before you leave AGR, unless one is planned (like a refinance). New inquiries and new accounts each lower a score a little for a year.');
+  add(retI,'duty','After you retire: list all your income',`When a lender asks for income, include retired pay${vaPct>=10?' and VA disability pay':''}. Lenders count both. ${vaPct>=10?'With a VA rating of 10% or more, the VA home loan funding fee is waived, which can save thousands on a future home.':''}`);
+  if(np)add(ymIdx(P.dnp?P.dnp.start:'2027-09'),'study','DNP school starts',V.pay==='loan'?'Federal Direct Unsubsidized loans don’t need a credit check. They show on your report as installment loans in deferment, which is fine.':'Paying tuition from take-home adds no new credit. Keep the cards from creeping back up during school.');
+  if(loanStart)add(loanStart,'study','DNP loan payments start','Put them on autopay. Federal servicers take 0.25% off the rate with autopay. On-time student loan payments build a strong history.');
+  if(dream)add(dream-12,'plain','A year before buying land or a home','Stop opening new credit, keep card use under 10%, and check all three reports. That is when your score matters most, since a higher score means a lower rate on a large loan.');
+  if(V.mextra&&+V.mextra>0)add(n0,'plain',`Your $${V.mextra} extra on the mortgage`,'Paying off a mortgage early can dip your score a few points because an old installment account closes. It is still worth it if you are debt free otherwise, but do the cards first.');
+  T.sort((a,b)=>a.i-b.i);
+  const tl=T.map((e,n)=>`<li class="ev ${e.side}"><span class="evb">${n+1}</span><div><b>${e.i<=n0?'Now':ym(e.i)}: ${e.t}</b><div class="small">${e.x}</div></div></li>`).join('');
+  // chart of card use
+  let chart='';if(limSum){const N=Math.min(sim.rows.length,72),xs=sim.rows.slice(0,N).map(r=>r.i).filter(i=>i%2===0);
+    chart=lineChart('cutil',{xs,yfmt:pct0,aria:'Credit card use as a share of the limits',series:[{n:'Card balances ÷ limits',v:xs.map(i=>Math.min(1.2,util(sim.rows[i-start]))),c:'var(--s1)',fill:true},{n:'30% line',v:xs.map(()=>.3),c:'var(--s4)',dash:true},{n:'10% line',v:xs.map(()=>.1),c:'var(--s3)',dash:true}]});}
+  const miss=cards.filter(x=>!x.lim).map(x=>x.d.short||x.d.name);
+  // factors
+  const F=[['Payment history','35%',PC.historyShort||'Autopay everything; one 30-day late payment can cost 60 to 100 points.'],
+    ['Amounts owed','30%',u0===null?'Add your card limits to see this.':`Cards at ${pct0(u0)} of their limits now${u30?`, under 30% by ${ym(u30)}`:''}.`],
+    ['Length of history','15%',PC.age||'Keep your oldest cards open.'],['New credit','10%','Fewer applications is better; rate shopping within 14 days counts once.'],['Credit mix','10%','You already have cards, a car loan and a mortgage, which is a good mix.']];
+  // investing
+  const sv=svState(),cash=+sv.cash||0,need=Math.round((P.budget.nowSpend||0)*(+sv.months||3)),vaJob=V.emp==='va';
+  const firstCard=known.length?Math.max(...known.map(x=>sim.D[x.k].end||0)):null,free=sim.free;
+  const inv=[
+    ['plain',`Now: a starter emergency fund`,`${cash?`You have ${money0(cash)} saved.`:'Savings are at $0 right now.'} Put $1,000 to $2,000 in a high-yield savings account before extra debt payments, so a surprise bill doesn’t land back on a card. Then build to ${money0(need)} (${sv.months||3} months) once the cards are gone.`],
+    ['plain','Now: pay off the cards (a sure return)',`Every dollar off a 21% to 27% card earns that rate, tax free and risk free. No investment reliably beats it.${firstCard?` In this plan the cards are paid by ${ym(firstCard)}.`:''}`],
+    ['duty','Keep your TSP','Its fees are among the lowest anywhere. Leave it invested after you retire. The C Fund holds US large companies, the S Fund smaller US companies, and the I Fund companies in other countries. An L Fund picks the mix for you by your retirement year.'],
+    ['study',vaJob?'At the VA: TSP with the 5% match':'At the hospital: 403(b) or 457(b) match',vaJob?'As a VA nurse you keep paying into the TSP, and the VA adds up to 5% of pay. Put in at least 5%.':'Put in at least enough for the full match, even while paying down debt. It is an instant 50% to 100% return. A 457(b), if offered, has no early-withdrawal penalty when you leave the job.'],
+    ['plain',free?`After ${ym(free)}: a Roth IRA`:'After the debts: a Roth IRA','You can put in up to $7,500 a year (2026). Growth and withdrawals in retirement are tax free. A target-date index fund or a total world stock index fund is a simple single choice.'],
+    ['plain','Around the world, simply','A total world stock index fund (or the TSP I Fund next to the C Fund) holds thousands of companies in about 50 countries, so no single country decides your future. Many people keep 20% to 40% of stocks outside the US. Emerging-market funds grow faster on average but swing harder; keep them a small slice.'],
+    ['plain','Safe money for known dates','For money you’ll need on a date (DNP costs, a down payment, the farm build), use high-yield savings, CDs, Treasury bills or I bonds from TreasuryDirect, not stocks.'],
+    ['plain','Be careful with','Buying property overseas, single foreign stocks, crypto, and anything sold as guaranteed high returns. They are hard to research and easy to lose money on.']];
+  return `<div class="stack"><h2>Credit score</h2>
+   <p class="muted">What to do and when, built from your debts and the choices at the top of the page (retirement date, job, Debt plan order and the mortgage extra). Change a choice and this page changes with it.</p>
+   <div class="tiles">${tile('Latest score',last?last.score:'Not logged',last?`${esc(last.src)}, ${fmt(parseDate(last.d))}`:'Add one below from CreditWise, your bank or a card app')}${tile('Card use now',u0===null?'—':pct0(u0),limSum?`of ${money0(limSum)} in limits`:'add your limits')}${tile('Under 30%',u30?ym(u30):'—','by the Debt plan')}${tile('Debt free',free?ym(free):'later','besides the mortgage')}</div>
+   ${miss.length?`<p class="small warnbox">I don’t know the limit on: ${miss.map(esc).join(', ')}. Card use above counts only the cards with a known limit.</p>`:''}
+   <div class="panel stack"><div class="eyebrow-s">Your timeline</div><ol class="evs">${tl}</ol></div>
+   ${chart?`<div class="panel stack"><div class="eyebrow-s">Card balances as a share of the limits</div>${chart}<p class="small muted">From the Debt plan with your current payoff order and extra payments.</p></div>`:''}
+   <div class="panel stack"><div class="eyebrow-s">What goes into a FICO score</div><div class="pl-list">${F.map(([k,w,t])=>`<div class="pl-row"><div><b>${k}</b><div class="small muted">${esc(t)}</div></div><div class="amt">${w}</div></div>`).join('')}</div></div>
+   <div class="panel stack"><div class="eyebrow-s">Log your score</div><div class="row" style="flex-wrap:wrap;gap:8px"><input type="number" id="crScore" min="300" max="850" placeholder="Score" style="width:110px" aria-label="Credit score"><input type="text" id="crSrc" placeholder="Where from (e.g. CreditWise)" style="width:220px" aria-label="Where the score is from"><button class="btn" id="crAdd">Log it</button></div>
+    ${C.log.length?`<div class="pl-list">${C.log.slice().reverse().map(x=>`<div class="pl-row"><div>${fmt(parseDate(x.d))} <span class="small muted">${esc(x.src)}</span></div><div class="amt">${x.score}</div></div>`).join('')}</div>`:''}</div>
+   <div class="panel stack"><div class="eyebrow-s">Investing, here and around the world</div><p class="small">In order, using your plan. These are general ideas, not advice for your exact situation. For free one-on-one help, Military OneSource (800-342-9647) has personal financial counselors.</p>
+    <div class="pl-list">${inv.map(([side,t,x])=>`<div class="pl-row ${side==='plain'?'':side}"><div><b>${esc(t)}</b><div class="small">${esc(x)}</div></div></div>`).join('')}</div>
+    <p class="small"><button class="link" data-tab="money">See the Investing charts on Money charts</button></p></div>
+  </div>`;}
+function bindCredit(){bindCharts();const b=$('#crAdd');if(b)b.onclick=()=>{const v=+$('#crScore').value;if(!(v>=300&&v<=850))return;crState().log.push({d:dkey(new Date()),score:v,src:$('#crSrc').value.trim()||'Score'});save();render();};}
+const VIEWS={calc:[vCalc,()=>{bindCalc();bindCharts();}],debt:[vDebt,bindDebt],money:[vMoney,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup],dates:[vDates,bindDates],save:[vSave,bindSave],cal:[vCal,bindCal],spend:[vSpend,()=>bindCharts()],rw:[vRewards,bindRewards],dream:[vDream,bindDream],wish:[vWish,bindWish],credit:[vCredit,bindCredit]};
+function gBar(){ // the plan choices, the same on every tab
+  if(!S.plan||!S.plan.options)return '';const V=planView(),P=S.plan;let R;try{R=calcResult();}catch(e){R={rounded:'?'};}
+  return `<div class="gbar" role="group" aria-label="Plan choices used on every tab">
+   <div class="g g-duty"><span class="eyebrow-s">Retire from AGR</span>${segBtns(V,'date',Object.keys(P.options).sort().map(d=>[d,P.options[d].label]))}</div>
+   <div class="g g-study"><span class="eyebrow-s">Nursing job</span>${segBtns(V,'job',[['rn','BSN RN'],['np','PMHNP, DNP']])}</div>
+   <div class="g g-study"><span class="eyebrow-s">Employer</span>${segBtns(V,'emp',[['civ','Hospital or clinic'],['va','The VA']])}</div>
+   ${V.emp==='va'?'':`<div class="g g-study"><span class="eyebrow-s">City</span>${segBtns(V,'city',[['tc','Twin Cities'],['roch','Rochester']])}</div>`}
+   <div class="g g-duty"><span class="eyebrow-s">VA rating</span>${segBtns(V,'va',[['est',`My estimate (${R.rounded}%)`],['70','70%'],['100','100%']])}</div>
+  </div>`;}
+function pvClick(b){planView()[b.dataset.pv]=b.dataset.val;if(b.dataset.pv==='date'&&S.profile&&(S.profile.sepType||'Retirement')==='Retirement')S.profile.sep=b.dataset.val;save();render();}
 function render(){
   if(!VIEWS[S.tab])S.tab='dash';
   renderTabs();renderBanner();renderFileBar();const an=S.appName||'Claim Kit';$('#appName').textContent=an;document.title=an;
   const [v,b]=VIEWS[S.tab];
-  try{$('#main').innerHTML=`<section class="view" role="tabpanel" aria-labelledby="tab-${S.tab}">${v()}</section>`;b();}
+  try{$('#main').innerHTML=`<section class="view" role="tabpanel" aria-labelledby="tab-${S.tab}">${S.tab==='backup'?'':gBar()}${v()}</section>`;b();document.querySelectorAll('.gbar [data-pv]').forEach(x=>x.onclick=()=>pvClick(x));}
   catch(e){console.error(e);const bad=S.tab;
     $('#main').innerHTML=`<section class="view"><div class="card warnbox"><h2>This tab hit a problem</h2><p>Your saved data is safe. Nothing was changed or erased.</p><p class="small">${esc(String(e&&e.message||e))}</p><div class="row"><button class="btn primary" id="errHome">Go to Dashboard</button></div></div></section>`;
     $('#errHome').onclick=()=>{S.tab=bad==='dash'?'backup':'dash';save();render();};}
