@@ -8,6 +8,7 @@
   var BUILT_IN = window.TRIVIA_QUESTIONS;
   var Store = window.TriviaStore;
   var Daily = window.TriviaDaily;
+  var WAGER_POINTS = 100;
   var Scoring = window.TriviaScoring;
   var Rewards = window.TriviaRewards;
   var Avatar = window.TriviaAvatar;
@@ -298,7 +299,7 @@
     Store.saveProfile({ name: name });
     if (todaysDaily()) return go('home');
     var plan = Daily.build(Daily.today());
-    state.game = newGame('daily', [name], plan.questions, plan.timer);
+    state.game = newGame('daily', [name], plan.questions.slice(), plan.timer);
     state.game.daily = plan;
     // Saved before the first question so quitting or reloading can't earn a replay.
     saveDailyProgress();
@@ -308,16 +309,29 @@
   function saveDailyProgress(done) {
     var g = state.game;
     var p = g.players[0];
+    var base = g.daily.questions.length;
     var result = {
       player: p.name,
       date: g.daily.date,
       number: g.daily.number,
       score: p.score,
       correct: p.correct,
-      total: g.questions.length,
-      pattern: g.questions.map(function (_, i) { return !!g.pattern[i]; }),
+      total: base,
+      pattern: g.daily.questions.map(function (_, i) { return !!g.pattern[i]; }),
       finished: !!done
     };
+    var w = g.wager;
+    if (w) {
+      result.base = w.base;
+      // Until the wager question is answered it is saved as lost, so quitting
+      // or reloading can't dodge a wrong answer.
+      var lost = w.right === null;
+      result.wager = { category: w.category, name: w.name, amount: w.amount, right: lost ? false : w.right };
+      if (lost) {
+        result.correct = Math.max(0, w.base - w.amount);
+        result.score = Math.max(0, p.score - w.amount * WAGER_POINTS);
+      }
+    }
     var u = Store.user();
     if (u) result.uid = u.uid;
     state.dailyResults = state.dailyResults.filter(function (r) {
@@ -372,6 +386,8 @@
     var player = currentPlayer();
     var right = choice !== null && item.options[choice] === item.q.answer;
 
+    if (isWagerQuestion()) return answerWager(choice, right);
+
     g.picked = choice;
     g.lastScore = right
       ? Scoring.score(item.q.difficulty, timeLeft, player.streak + 1, item.q.category === g.featured)
@@ -393,9 +409,144 @@
     go('reveal');
   }
 
+  // ---------- red shell ----------
+  // Finishing a Daily Challenge with more than 10 right (only possible by
+  // winning the wager) sends a red shell at everyone else: it flies at them
+  // during the first question they play after that. Each shell hits a device
+  // once, and only shells from the last week count.
+
+  var SHELLS_SEEN_KEY = 'trivia.shellsSeen.v1';
+
+  function readSeenShells() {
+    try { return JSON.parse(window.localStorage.getItem(SHELLS_SEEN_KEY)) || {}; } catch (e) { return {}; }
+  }
+
+  function markShellsSeen(list) {
+    var seen = readSeenShells();
+    list.forEach(function (r) { seen[playerKey(r) + '|' + r.date] = true; });
+    try { window.localStorage.setItem(SHELLS_SEEN_KEY, JSON.stringify(seen)); } catch (e) { /* fine: it may fire again */ }
+  }
+
+  function pendingShells() {
+    var seen = readSeenShells();
+    var cutoff = addDays(Daily.today(), -7);
+    return state.dailyResults.filter(function (r) {
+      return r.correct > 10 && r.date >= cutoff && !isMe(r) && !seen[playerKey(r) + '|' + r.date];
+    }).sort(function (a, b) { return b.correct - a.correct; }).slice(0, 3);
+  }
+
+  // Called after every render; acts once per visit, on the first question shown.
+  function maybeRedShell() {
+    if (state.shellChecked || !document.querySelector('.question-card .answers button:not([disabled])')) return;
+    state.shellChecked = true;
+    var shells = pendingShells();
+    if (!shells.length || !window.TRIVIA_RED_SHELL) return;
+    markShellsSeen(shells);
+    shells.forEach(function (r, i) { setTimeout(function () { throwShell(r, i === shells.length - 1 ? shells : null); }, i * 900); });
+  }
+
+  function throwShell(r, all) {
+    var layer = document.createElement('div');
+    layer.className = 'red-shell-layer';
+    layer.setAttribute('aria-hidden', 'true');
+    layer.innerHTML = '<img class="red-shell-fly" alt="" src="' + window.TRIVIA_RED_SHELL + '">';
+    document.body.appendChild(layer);
+    setTimeout(function () {
+      var card = document.querySelector('.question-card');
+      if (card) {
+        card.classList.remove('shell-hit');
+        void card.offsetWidth;
+        card.classList.add('shell-hit');
+      }
+      if (all) {
+        var names = all.map(function (x) { return x.player + ' (' + x.correct + ' right)'; });
+        var toast = document.createElement('div');
+        toast.className = 'red-shell-toast';
+        toast.setAttribute('role', 'status');
+        toast.textContent = 'Red shell! ' + names.join(', ') + ' won the wager and sent ' + (all.length > 1 ? 'these' : 'it') + ' your way.';
+        document.body.appendChild(toast);
+        setTimeout(function () { toast.remove(); }, 4500);
+      }
+    }, 1100);
+    setTimeout(function () { layer.remove(); }, 1700);
+  }
+
+  // ---------- daily wager ----------
+  // After the ten, a player can bet all their right answers on one more
+  // question from one of the day's categories: right doubles them, wrong
+  // loses them. Each wagered right answer is worth WAGER_POINTS points.
+
+  function isWagerQuestion() {
+    var g = state.game;
+    return !!(g && g.wager && g.index === g.wager.index);
+  }
+
+  function startWager(cat) {
+    var g = state.game;
+    var p = g.players[0];
+    var item = g.daily.wager[cat];
+    if (!item || g.wager || !p.correct) return;
+    g.wager = { category: cat, name: catName(cat), amount: p.correct, base: p.correct, right: null, index: g.questions.length };
+    g.questions.push(item);
+    g.index = g.wager.index;
+    saveDailyProgress();
+    showQuestion();
+  }
+
+  function answerWager(choice, right) {
+    var g = state.game;
+    var item = g.questions[g.index];
+    var p = g.players[0];
+    var w = g.wager;
+    g.picked = choice;
+    g.lastScore = null;
+    w.right = right;
+    p.answered += 1;
+    g.unlock = recordAnswer(p.name, item.q.category, right);
+    if (right) {
+      p.correct += w.amount;
+      g.points = w.amount * WAGER_POINTS;
+      p.score += g.points;
+    } else {
+      p.correct = Math.max(0, p.correct - w.amount);
+      g.points = -Math.min(p.score, w.amount * WAGER_POINTS);
+      p.score += g.points;
+    }
+    saveDailyProgress(true);
+    go('reveal');
+  }
+
+  function viewWager() {
+    var g = state.game;
+    var n = g.players[0].correct;
+    var cats = g.daily.categories.filter(function (c) { return g.daily.wager[c]; });
+    if (!n) {
+      return topbar('') +
+        '<section class="card"><h1>Wager round</h1>' +
+          '<p class="muted">You need at least one right answer to place a wager. Better luck tomorrow.</p>' +
+          '<button class="btn-primary" data-action="wager-skip">See my result</button></section>';
+    }
+    return topbar('') +
+      '<section class="card"><h1>Wager round</h1>' +
+        '<p>You got <strong>' + n + ' of ' + g.daily.questions.length + '</strong> right. Bet all ' + n + ' on one more question from a category of the day.</p>' +
+        '<ul class="rule-list">' +
+          '<li>Right: you finish with <strong>' + (n * 2) + ' right</strong> and +' + (n * WAGER_POINTS) + ' points.</li>' +
+          '<li>Wrong: you drop to <strong>0 right</strong> and lose up to ' + (n * WAGER_POINTS) + ' points.</li>' +
+          '<li>Finish above 10 right and everyone else gets hit with a red shell.</li>' +
+        '</ul>' +
+        '<div class="cat-grid wager-cats">' + cats.map(function (c) {
+          return '<button class="cat-tile" data-cat="' + c + '" data-action="wager-pick" data-id="' + c + '">' +
+            '<span class="dot"></span><span class="name">' + esc(catName(c)) + '</span>' +
+            (c === g.daily.featured ? '<span class="count">of the day</span>' : '') + '</button>';
+        }).join('') + '</div>' +
+        '<button class="btn-ghost" data-action="wager-skip">No wager, keep my ' + n + '</button>' +
+      '</section>';
+  }
+
   function next() {
     var g = state.game;
     g.index += 1;
+    if (g.mode === 'daily' && !g.wager && !g.wagerSkipped && g.index >= g.questions.length) return go('wager');
     if (g.index >= g.questions.length) return finish();
     beginTurn();
   }
@@ -478,6 +629,7 @@
 
   function progressText() {
     var g = state.game;
+    if (isWagerQuestion()) return 'Wager round';
     return 'Q ' + (g.index + 1) + ' of ' + g.questions.length;
   }
 
@@ -518,7 +670,8 @@
       ? '<p class="muted">' + esc(done.player) + ', you played today. ' + (done.finished ? '' : 'Unanswered questions count as misses. ') +
           'A new challenge unlocks at midnight.</p>' +
         '<div class="stat-grid">' +
-          '<div class="stat"><div class="v">' + done.correct + '/' + done.total + '</div><div class="k">correct</div></div>' +
+          '<div class="stat"><div class="v">' + (done.wager ? done.correct : done.correct + '/' + done.total) + '</div><div class="k">' +
+            (done.wager ? (done.wager.right ? 'right, wager won' : 'right, wager lost') : 'correct') + '</div></div>' +
           '<div class="stat"><div class="v">' + done.score + '</div><div class="k">points</div></div>' +
           '<div class="stat"><div class="v">' + streak + '</div><div class="k">day streak</div></div>' +
         '</div>' + shareBlock(done) +
@@ -625,7 +778,7 @@
       var row = byName[key] || (byName[key] = { key: key, name: r.player, mine: isMe(r), points: 0, days: 0, correct: 0, total: 0, best: 0 });
       row.points += r.score;
       row.days += 1;
-      row.correct += r.correct;
+      row.correct += Daily.baseCorrect(r);
       row.total += r.total;
       row.best = Math.max(row.best, r.score);
     });
@@ -769,7 +922,8 @@
         ? '<div class="board">' + rows.map(function (r, i) {
             return '<div class="board-row' + (isMe(r) ? ' current' : '') + '">' +
               '<span class="rank">' + (i + 1) + '</span>' +
-              '<span class="name">' + esc(r.player) + ' <span class="sub">' + r.correct + '/' + r.total + '</span>' +
+              '<span class="name">' + esc(r.player) + ' <span class="sub">' + Daily.baseCorrect(r) + '/' + r.total +
+                (r.wager ? (r.wager.right ? ' · won wager → ' : ' · lost wager → ') + r.correct + ' right' : '') + '</span>' +
               '<span class="dots">' + r.pattern.map(function (hit) { return '<i class="' + (hit ? 'hit' : 'miss') + '"></i>'; }).join('') + '</span></span>' +
               '<span class="score">' + r.score + '</span></div>';
           }).join('') + '</div>'
@@ -830,7 +984,9 @@
     return topbar('') +
       '<section class="card winner">' +
         '<p class="crown">Daily Challenge #' + result.number + '</p>' +
-        '<h1>' + result.correct + ' out of ' + result.total + '</h1>' +
+        '<h1>' + (result.wager ? result.correct + ' right' : result.correct + ' out of ' + result.total) + '</h1>' +
+        (result.wager ? '<p class="muted">' + Daily.baseCorrect(result) + ' of ' + result.total + ', then ' + (result.wager.right ? 'won' : 'lost') +
+          ' a wager of ' + result.wager.amount + ' on ' + esc(result.wager.name) + '.</p>' : '') +
         '<div class="stat-grid" style="width:100%">' +
           '<div class="stat"><div class="v">' + result.score + '</div><div class="k">points</div></div>' +
           '<div class="stat"><div class="v">' + state.game.players[0].bestStreak + '</div><div class="k">best run</div></div>' +
@@ -946,9 +1102,11 @@
     var d = item.q.difficulty || 2;
     var featured = item.q.category === g.featured;
     var nextX = Scoring.streakMultiplier(p.streak + 1);
-    var tags = '<span class="tag diff-' + d + '">' + Scoring.LABEL[d] + ' · ' + Scoring.BASE[d] + '</span>' +
-      (featured ? '<span class="tag tag-featured">Category of the day ×' + Scoring.FEATURED_BONUS + '</span>' : '') +
-      (nextX > 1 ? '<span class="tag tag-streak">Streak ×' + nextX + '</span>' : '');
+    var tags = isWagerQuestion()
+      ? '<span class="tag tag-featured">' + g.wager.amount + ' right on the line</span>'
+      : '<span class="tag diff-' + d + '">' + Scoring.LABEL[d] + ' · ' + Scoring.BASE[d] + '</span>' +
+        (featured ? '<span class="tag tag-featured">Category of the day ×' + Scoring.FEATURED_BONUS + '</span>' : '') +
+        (nextX > 1 ? '<span class="tag tag-streak">Streak ×' + nextX + '</span>' : '');
     return '<div class="q-meta"><span class="cat-badge">' + esc(catName(item.q.category)) + (item.q.custom ? ' · Custom' : '') + '</span>' +
       '<span class="progress">' + esc(p.name) + ' · ' + progressText() + '</span></div>' +
       '<div class="tags">' + tags + '</div>' +
@@ -994,13 +1152,22 @@
     var last = g.index + 1 >= g.questions.length;
     var nextName = last ? '' : g.players[(g.index + 1) % g.players.length].name;
 
-    var verdict = right
+    var verdict = isWagerQuestion() ? '' : right
       ? '<div class="verdict good"><strong>Correct</strong><span class="pts">+' + g.points + '</span>' + breakdown(g.lastScore) + '</div>'
       : '<div class="verdict bad"><strong>' + (timedOut ? 'Time\'s up' : 'Not quite') + '</strong><span>Answer: ' + esc(item.q.answer) + '</span></div>';
+    if (isWagerQuestion()) {
+      var w = g.wager;
+      verdict = w.right
+        ? '<div class="verdict good"><strong>Wager won</strong><span class="pts">+' + g.points + '</span>' +
+            '<span>' + w.base + ' right doubled to ' + p.correct + '.</span></div>'
+        : '<div class="verdict bad"><strong>Wager lost</strong><span>Answer: ' + esc(item.q.answer) + '. Your ' + w.base +
+            ' right drop to ' + p.correct + (g.points ? ' and ' + (-g.points) + ' points' : '') + '.</span></div>';
+    }
 
     var streak = right && p.streak >= 3 ? '<p class="small muted">' + esc(p.name) + ' is on a ' + p.streak + '-answer streak.</p>' : '';
 
     var nextLabel = last ? 'See final scores' : (g.players.length > 1 ? 'Next: ' + esc(nextName) : 'Next question');
+    if (last && g.mode === 'daily') nextLabel = g.wager || g.wagerSkipped ? 'See my result' : 'On to the wager round';
 
     return topbar(quitButton()) +
       '<section class="card question-card" data-cat="' + item.q.category + '">' +
@@ -1758,6 +1925,7 @@
     talk: viewTalk,
     share: viewShare,
     'daily-result': viewDailyResult,
+    wager: viewWager,
     setup: viewSetup,
     handoff: viewHandoff,
     question: viewQuestion,
@@ -1776,6 +1944,7 @@
       again.value = keep.value;
       if (keep.focused) { again.focus(); again.setSelectionRange(keep.pos, keep.pos); }
     }
+    maybeRedShell();
   }
 
   // ---------- events ----------
@@ -1829,6 +1998,13 @@
         break;
       case 'next':
         next();
+        break;
+      case 'wager-pick':
+        startWager(el.getAttribute('data-id'));
+        break;
+      case 'wager-skip':
+        state.game.wagerSkipped = true;
+        finish();
         break;
       case 'quit':
         if (state.quitArmed) { state.game = null; go('home'); }

@@ -2,7 +2,7 @@
 
 Pass-and-play trivia for a group of friends on one phone or laptop.
 
-- 2 to 8 players (or solo), 13 color-coded categories (758 questions, about 60 per category), optional 15/20/30 second timer.
+- 2 to 8 players (or solo), 20 color-coded categories (2,378 questions, about 120 per category), optional 15/20/30 second timer.
 - Scoring: Easy 100, Medium 200, Hard 300, plus up to 25% for speed. Three right in a row
   scores x1.5, five or more x2. The category of the day scores x2 in every mode (`js/scoring.js`).
 - Category rewards: 5, 15, 30, 60 and 100 right answers in a category unlock five objects, each
@@ -24,6 +24,12 @@ Pass-and-play trivia for a group of friends on one phone or laptop.
 - **Daily Challenge:** everyone gets the same 10 questions each day (3 rotating categories), plays once,
   and copies a Wordle-style result into the group chat. It needs no server: the date seeds the pick
   (`js/daily.js`), so every copy of the app on the same version agrees. Custom questions are left out.
+- **Wager round:** after the 10 Daily Challenge questions, a player can bet all their right answers on one
+  more hard question from one of the day's categories. Right doubles them (and adds 100 points per right
+  answer); wrong drops them to 0 (and takes away up to the same points). Skipping keeps the score as is.
+- **Red shell:** if anyone finishes a game with more than 10 right, everyone else gets a red shell thrown at
+  them on their first question the next time they open the app (once per device, results from the last 7 days).
+  It is only for show and changes no scores.
 
 ## Run it
 
@@ -86,7 +92,8 @@ without changing the game flow in `js/app.js`.
 - `index.html` – page shell
 - `styles.css` – look and feel, light and dark themes
 - `js/questions.js` – built-in categories and questions
-- `js/why.js` – the explanation shown after each built-in question
+- `js/why.js` – the explanation shown after each of the older built-in questions (newer ones carry their own `why`)
+- `js/redshell.js` – the red shell picture, embedded as a data URL
 - `js/scoring.js` – point values, streak multiplier, category-of-the-day bonus
 - `js/rewards.js` – category reward ladders and unlock thresholds
 - `js/avatar.js` – avatar options and the SVG drawing

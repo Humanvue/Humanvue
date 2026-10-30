@@ -29,7 +29,7 @@
     glasses: ['none', 'round', 'square', 'aviators', 'goggles'],
     hat: ['none', 'beret', 'scrub cap', 'ball cap', 'headset'],
     shirt: ['#56702a', '#16807f', '#2c67ad', '#b3322f', '#34427a', '#1a1e18'],
-    bg: ['military', 'nursing', 'science', 'pop', 'sports', 'geo', 'politics', 'ushistory', 'worldhistory', 'philosophy', 'film', 'lit', 'auto'],
+    bg: ['military', 'nursing', 'science', 'pop', 'sports', 'geo', 'politics', 'ushistory', 'worldhistory', 'philosophy', 'film', 'lit', 'auto', 'music', 'movies', 'tv', 'chemistry', 'physics', 'biology', 'boardgames'],
     item: ITEMS.map(function (i) { return i[0]; }),
     // 'person', or any object from the list with a face, hair and hats on it.
     body: ['person'].concat(ITEMS.slice(1).map(function (i) { return i[0]; }))
@@ -58,7 +58,9 @@
     for (var i = 0; i < (name || '').length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
     var pick = function (k, salt) { var list = OPTIONS[k]; return list[(h >>> salt) % list.length]; };
     return { body: 'person', glasses: 'none', skin: pick('skin', 1), eyes: pick('eyes', 3), hair: pick('hair', 5), hairColor: pick('hairColor', 8), face: pick('face', 11),
-      hat: 'none', shirt: pick('shirt', 14), bg: pick('bg', 17), item: 'none' };
+      hat: 'none', shirt: pick('shirt', 14), item: 'none',
+      // Only the first 13 backgrounds, so default avatars kept their look when categories were added.
+      bg: OPTIONS.bg[(h >>> 17) % 13] };
   }
 
   // Mixes a hex color toward black (amt < 0) or white (amt > 0).

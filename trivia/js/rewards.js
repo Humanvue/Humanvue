@@ -22,7 +22,14 @@
     philosophy: ['Scroll', 'Oil Lamp', 'Laurel Wreath', 'Marble Bust', 'Golden Owl of Athena'],
     film: ['Popcorn Bucket', 'VHS Tape', 'Clapperboard', 'Director\'s Chair', 'Golden Statuette'],
     lit: ['Library Card', 'Bookmark', 'Fountain Pen', 'Signed First Edition', 'Golden Quill'],
-    auto: ['Air Freshener', 'Socket Wrench', 'Checkered Flag', 'V8 Engine', 'Gold Steering Wheel']
+    auto: ['Air Freshener', 'Socket Wrench', 'Checkered Flag', 'V8 Engine', 'Gold Steering Wheel'],
+    music: ['Guitar Pick', 'Cassette Walkman', 'Electric Guitar', 'Grand Piano', 'Golden Microphone'],
+    movies: ['Movie Ticket', '3D Glasses', 'Film Reel', 'Walk of Fame Star', 'Golden Projector'],
+    tv: ['Remote Control', 'TV Guide', 'Rabbit-Ear Antenna', 'Studio Camera', 'Golden Emmy'],
+    chemistry: ['Litmus Strip', 'Beaker', 'Erlenmeyer Flask', 'Periodic Table', 'Bar of Pure Gold'],
+    physics: ['Horseshoe Magnet', 'Glass Prism', 'Tesla Coil', 'Particle Accelerator', 'Einstein\'s Chalkboard'],
+    biology: ['Petri Dish', 'Butterfly Net', 'Fossil', 'DNA Model', 'Golden Darwin Medal'],
+    boardgames: ['Pair of Dice', 'Top Hat Token', 'Scrabble Tiles', 'Marble Chess Set', 'Golden King']
   };
 
   // Highest tier reached with this many right answers: -1 means none yet.

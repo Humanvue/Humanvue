@@ -61,14 +61,34 @@
     var questions = seededShuffle(pool, rand).slice(0, QUESTIONS_PER_DAY).map(function (q) {
       return { q: q, options: seededShuffle([q.answer].concat(q.wrong), rand) };
     });
+    // One wager question per category of the day, the same for everyone, never
+    // one of the ten. Drawn from its own seed so it can't shift the ten above.
+    var used = questions.map(function (item) { return item.q.id; });
+    var wrand = rng(seedFrom('squad-trivia:wager:' + date));
+    var wager = {};
+    cats.forEach(function (cat) {
+      var left = pool.filter(function (q) { return q.category === cat && used.indexOf(q.id) === -1; });
+      var hard = left.filter(function (q) { return q.difficulty === 3; });
+      var q = seededShuffle(hard.length ? hard : left, wrand)[0];
+      if (q) wager[cat] = { q: q, options: seededShuffle([q.answer].concat(q.wrong), wrand) };
+    });
     // The first category drawn is the day's featured category (double points).
-    return { date: date, number: number(date), categories: cats, featured: cats[0], questions: questions, timer: TIMER };
+    return { date: date, number: number(date), categories: cats, featured: cats[0], questions: questions, wager: wager, timer: TIMER };
   }
 
   function shareText(result) {
     var squares = result.pattern.map(function (hit) { return hit ? '🟩' : '🟥'; }).join('');
+    var w = result.wager;
+    var bet = w && w.right !== null && w.right !== undefined
+      ? '\nWager ' + w.amount + ' on ' + w.name + ': ' + (w.right ? '✅ ' : '❌ ') + result.correct + ' right'
+      : '';
     return 'Squad Trivia Daily #' + result.number + '\n' +
-      result.correct + '/' + result.total + ' · ' + result.score + ' pts\n' + squares;
+      baseCorrect(result) + '/' + result.total + ' · ' + result.score + ' pts\n' + squares + bet;
+  }
+
+  // Right answers in the ten, before any wager moved the total.
+  function baseCorrect(result) {
+    return typeof result.base === 'number' ? result.base : result.correct;
   }
 
   // Consecutive days played, counting back from the most recent date given.
@@ -91,6 +111,7 @@
     number: number,
     build: build,
     shareText: shareText,
+    baseCorrect: baseCorrect,
     streak: streak
   };
 })();
