@@ -167,6 +167,14 @@ a{color:var(--study)}
 details.panel>summary{cursor:pointer}
 .panel-in{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--surface-2)}
 .tgl{cursor:pointer}.tgl input{margin-top:4px;accent-color:var(--accent);width:18px;height:18px;flex:none}
+.hrow{display:grid;grid-template-columns:110px 1fr;gap:10px;padding:8px 10px;border-left:4px solid var(--hk);background:var(--surface-2);border-radius:8px}
+.hdate{font:600 .82rem var(--f-mono);display:flex;flex-direction:column;gap:2px}.hdx{font-size:.85rem;color:var(--ink-2)}
+.hyear{display:grid;grid-template-columns:52px 1fr;gap:10px}.hy{font:700 1rem var(--f-display);color:var(--ink-2);padding-top:6px}
+.hstrip{width:100%;height:auto;display:block}.hstrip .hpre{fill:var(--surface-2)}.hstrip .hsvc{fill:color-mix(in srgb,var(--duty) 10%,transparent)}
+.hstrip .htick{stroke:var(--line)}.hstrip .htt{font:10px var(--f-mono);fill:var(--ink-3);text-anchor:middle}.hstrip .hcar{fill:var(--duty)}.hstrip .hcar.dep{fill:var(--bad)}
+.hsvcp{border-left:4px solid var(--duty)}.hprep{border-left:4px solid var(--ink-3)}
+.htab{border-collapse:collapse;width:100%;font-size:.88rem}.htab th,.htab td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+@media (max-width:560px){.hrow{grid-template-columns:1fr}.hyear{grid-template-columns:1fr}}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.tile{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface-2)}
 .tbig{font-family:var(--f-display);font-weight:700;font-size:1.8rem;line-height:1.1;font-variant-numeric:tabular-nums}
 .warnbox{background:var(--warn-bg);border-left:4px solid var(--warn);padding:8px 10px;border-radius:6px}
@@ -366,7 +374,7 @@ function progress(){
 }
 
 /* ---------- Tabs ---------- */
-const TABS=[['dash','Dashboard'],['cal','Calendar'],['rw','Rewards'],['steps','Steps'],['me','About me'],['conds','Conditions'],['scan','Scan records'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['dates','Deadlines'],['calc','Calculator'],['debt','Debt plan'],['money','Money charts'],['save','Savings & taxes'],['credit','Credit score'],['spend','Spending'],['wish','Wishlist'],['backup','Backup & help']];
+const TABS=[['dash','Dashboard'],['cal','Calendar'],['rw','Rewards'],['steps','Steps'],['me','About me'],['conds','Conditions'],['scan','Scan records'],['health','Health timeline'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['dates','Deadlines'],['calc','Calculator'],['debt','Debt plan'],['money','Money charts'],['save','Savings & taxes'],['credit','Credit score'],['spend','Spending'],['wish','Wishlist'],['backup','Backup & help']];
 function renderTabs(){
   $('#tabs').innerHTML=TABS.map(([id,n])=>`<button role="tab" id="tab-${id}" aria-selected="${S.tab===id}" data-tab="${id}">${n}</button>`).join('');
 }
@@ -2001,7 +2009,64 @@ function vCredit(){
     <p class="small"><button class="link" data-tab="money">See the Investing charts on Money charts</button></p></div>
   </div>`;}
 function bindCredit(){bindCharts();const b=$('#crAdd');if(b)b.onclick=()=>{const v=+$('#crScore').value;if(!(v>=300&&v<=850))return;crState().log.push({d:dkey(new Date()),score:v,src:$('#crSrc').value.trim()||'Score'});save();render();};}
-const VIEWS={calc:[vCalc,()=>{bindCalc();bindCharts();}],debt:[vDebt,bindDebt],money:[vMoney,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup],dates:[vDates,bindDates],save:[vSave,bindSave],cal:[vCal,bindCal],spend:[vSpend,()=>bindCharts()],rw:[vRewards,bindRewards],dream:[vDream,bindDream],wish:[vWish,bindWish],credit:[vCredit,bindCredit]};
+/* ---------- Health timeline: every visit and diagnosis on one timeline; care before the Army in its own area ---------- */
+const HKINDS=[['injury','Injury',2],['illness','Illness',1],['mental','Mental health',7],['surgery','Surgery',5],['check','Checkup or physical',3],['shot','Shots',6],['test','Tests & imaging',4]];
+const HV={kind:'all',dx:false,q:'',src:'all'};
+function hState(){S.health=Object.assign({ev:[],career:[],joined:(S.profile&&S.profile.entry)||''},S.health||{});return S.health;}
+function hDate(d){if(!d)return'';const p=String(d).split('-'),m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return p.length===1?p[0]:p.length===2?`${m[+p[1]-1]} ${p[0]}`:`${+p[2]} ${m[+p[1]-1]} ${p[0]}`;}
+function hYear(d){return +String(d).slice(0,4);}
+function hFrac(d){const p=String(d).split('-');return +p[0]+((+p[1]||6)-1)/12+((+p[2]||15)-1)/365;}
+function hKind(k){return HKINDS.find(x=>x[0]===k)||['other','Other',3];}
+function hMatch(e){if(HV.kind!=='all'&&e.kind!==HV.kind)return false;if(HV.dx&&!e.dx)return false;if(HV.src!=='all'&&(e.src||'')!==HV.src)return false;
+  if(HV.q){const q=HV.q.toLowerCase();if(![e.t,e.dx,e.note,e.area,e.src,e.place].join(' ').toLowerCase().includes(q))return false;}return true;}
+function hRow(e){const k=hKind(e.kind),c=e.cond&&S.conditions.find(x=>x.id===e.cond);
+  return `<div class="hrow" style="--hk:var(--s${k[2]})"><div class="hdate">${esc(hDate(e.d))}${e.age!=null?`<span class="small muted">age ${e.age}</span>`:''}</div>
+   <div class="stack" style="gap:3px"><div><b>${esc(e.t)}</b>${e.dx?` <span class="hdx">${esc(e.dx)}</span>`:''}</div>
+   ${e.note?`<div class="small">${esc(e.note)}</div>`:''}
+   <div class="row small muted" style="gap:6px;flex-wrap:wrap"><span class="chip plain">${esc(k[1])}</span>${e.area?`<span>${esc(e.area)}</span>`:''}${e.place?`<span>· ${esc(e.place)}</span>`:''}${e.src?`<span>· ${esc(e.src)}${e.pg?` p.${esc(e.pg)}`:''}</span>`:''}${e.hand?`<span class="chip warn" title="Read from handwriting; check the original page">handwritten</span>`:''}${c?`<button class="chip duty" data-tab="conds" title="Open this claim condition">Claim: ${esc(c.name)}</button>`:''}</div></div></div>`;}
+function hList(list){if(!list.length)return `<p class="small muted">Nothing matches these filters.</p>`;
+  const by={};list.forEach(e=>{(by[hYear(e.d)]=by[hYear(e.d)]||[]).push(e);});
+  return Object.keys(by).sort((a,b)=>b-a).map(y=>`<div class="hyear"><div class="hy">${y}</div><div class="stack" style="gap:6px">${by[y].sort((a,b)=>String(b.d).localeCompare(String(a.d))).map(hRow).join('')}</div></div>`).join('');}
+function hStrip(all,H){const y0=1982,y1=2028,W=1000,X=v=>((v-y0)/(y1-y0))*W,join=H.joined?hFrac(H.joined):2004.54,lanes=H.career||[];
+  const ticks=[];for(let y=1985;y<=2025;y+=5)ticks.push(`<line x1="${X(y)}" x2="${X(y)}" y1="14" y2="${70+lanes.length*0}" class="htick"/><text x="${X(y)}" y="10" class="htt">${y}</text>`);
+  const rows=HKINDS.map((k,i)=>({k,y:22+i*8}));
+  const dots=all.map(e=>{const r=rows.find(r=>r.k[0]===e.kind)||rows[1];return `<circle cx="${X(hFrac(e.d)).toFixed(1)}" cy="${r.y}" r="3.2" style="fill:var(--s${r.k[2]})"><title>${esc(hDate(e.d)+' · '+e.t+(e.dx?' · '+e.dx:''))}</title></circle>`;}).join('');
+  const cy=22+HKINDS.length*8+6,car=lanes.map((c,i)=>{const a=X(hFrac(c.from)),b=X(c.to?hFrac(c.to):2027.75);return `<rect x="${a.toFixed(1)}" y="${cy+(i%2)*9}" width="${Math.max(2,b-a).toFixed(1)}" height="7" rx="2" class="hcar${c.dep?' dep':''}"><title>${esc(hDate(c.from)+' to '+(c.to?hDate(c.to):'now')+' · '+c.t)}</title></rect>`;}).join('');
+  const Hh=cy+24;
+  return `<svg class="hstrip" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Care and diagnoses by year, 1982 to now">
+   <rect x="0" y="14" width="${X(join).toFixed(1)}" height="${Hh-14}" class="hpre"/><rect x="${X(join).toFixed(1)}" y="14" width="${(W-X(join)).toFixed(1)}" height="${Hh-14}" class="hsvc"/>
+   ${ticks.join('')}<text x="${(X(join)+4).toFixed(1)}" y="${Hh-3}" class="htt" style="text-anchor:start">Joined the Army</text><text x="4" y="${Hh-3}" class="htt" style="text-anchor:start">Before the Army</text>${dots}${car}</svg>`;}
+function hAreas(all,join){const m={};all.forEach(e=>{if(!e.area)return;const a=m[e.area]=m[e.area]||{pre:[],svc:[]};(String(e.d)<join?a.pre:a.svc).push(e);});
+  return Object.entries(m).sort((a,b)=>(b[1].pre.length+b[1].svc.length)-(a[1].pre.length+a[1].svc.length)).map(([a,v])=>{
+    const f=l=>l.length?`${l.length} · ${esc(hDate(l.map(e=>e.d).sort()[0]).replace(/^\d+ /,''))}${l.length>1?' to '+esc(hDate(l.map(e=>e.d).sort().slice(-1)[0]).replace(/^\d+ /,'')):''}`:'<span class="muted">none</span>';
+    return `<tr><td><b>${esc(a)}</b></td><td>${f(v.pre)}</td><td>${f(v.svc)}</td></tr>`;}).join('');}
+function vHealth(){const H=hState(),join=H.joined||'2004-07-15',all=H.ev.slice();
+  if(!all.length)return `<div class="panel stack"><h2>Health timeline</h2><p class="muted">No records loaded yet.</p></div>`;
+  const pre=all.filter(e=>String(e.d)<join),svc=all.filter(e=>String(e.d)>=join),f=all.filter(hMatch),fp=f.filter(e=>String(e.d)<join),fs=f.filter(e=>String(e.d)>=join);
+  const srcs=[...new Set(all.map(e=>e.src).filter(Boolean))].sort();
+  const tile=(l,b,s)=>`<div class="tile"><div class="eyebrow-s">${l}</div><div class="tbig">${b}</div><div class="small muted">${s}</div></div>`;
+  const chip=(k,n)=>`<button class="btn sm ${HV.kind===k?'primary':''}" data-hk="${k}">${n}</button>`;
+  return `<div class="stack"><h2>Health timeline</h2>
+   <p class="muted">Every visit, diagnosis, shot and test from your Army health record and your civilian records, on one line. Care from before you joined is kept in its own area at the bottom. Pages marked <span class="chip warn">handwritten</span> were read from cursive, so check the original page before you quote it.</p>
+   <div class="tiles">${tile('Since joining',svc.length,`entries from ${esc(hDate(join))}`)}${tile('Before the Army',pre.length,'entries, 1982 to 2004')}${tile('Diagnoses',all.filter(e=>e.dx).length,'entries with a diagnosis')}${tile('Linked to your claim',all.filter(e=>e.cond).length,'entries tied to a condition')}</div>
+   <div class="panel stack"><div class="eyebrow-s">Your whole health history</div>${hStrip(all,H)}
+    <div class="row small" style="gap:12px;flex-wrap:wrap">${HKINDS.map(k=>`<span class="row" style="gap:5px"><span class="dot" style="background:var(--s${k[2]})"></span>${k[1]}</span>`).join('')}<span class="row" style="gap:5px"><span class="dot" style="background:var(--duty)"></span>Army jobs (resume)</span></div></div>
+   <div class="panel stack"><div class="row" style="gap:6px;flex-wrap:wrap">${chip('all','All')}${HKINDS.map(k=>chip(k[0],k[1])).join('')}</div>
+    <div class="row" style="gap:12px;flex-wrap:wrap;align-items:center"><label class="row small" style="gap:6px"><input type="checkbox" id="hDx" ${HV.dx?'checked':''}> Diagnoses only</label>
+     <label class="row small" style="gap:6px">Source <select id="hSrc"><option value="all">All</option>${srcs.map(s=>`<option ${HV.src===s?'selected':''}>${esc(s)}</option>`).join('')}</select></label>
+     <input id="hQ" type="search" placeholder="Search: ankle, ear, back..." value="${esc(HV.q)}" style="flex:1;min-width:180px"></div></div>
+   <div class="panel stack hsvcp"><div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><h3 style="margin:0">🟩 Since you joined the Army</h3><span class="small muted">${fs.length} of ${svc.length} shown</span></div>${hList(fs)}</div>
+   <div class="panel stack"><div class="eyebrow-s">By body area: before and since joining</div><p class="small muted">VA asks whether a problem existed before service. This shows where your records have care on each side of the line.</p>
+    <div style="overflow-x:auto"><table class="htab"><thead><tr><th>Area</th><th>Before the Army</th><th>Since joining</th></tr></thead><tbody>${hAreas(all,join)}</tbody></table></div></div>
+   ${(H.career||[]).length?`<div class="panel stack"><div class="eyebrow-s">🟩 Army jobs from your resume</div>${H.career.slice().reverse().map(c=>`<div class="pl-row duty"><span><b>${esc(c.t)}</b>${c.note?`<div class="small muted">${esc(c.note)}</div>`:''}</span><span class="small muted">${esc(hDate(c.from))} to ${c.to?esc(hDate(c.to)):'now'}</span></div>`).join('')}</div>`:''}
+   <details class="panel stack hprep" ${HV.q||HV.kind!=='all'?'open':''}><summary><h3 style="display:inline;margin:0">Before the Army (1982 to ${esc(hDate(join))})</h3> <span class="small muted">${fp.length} of ${pre.length} shown</span></summary>
+    <p class="small muted">Childhood and teen care from your civilian records. VA uses these to judge pre-existing conditions. Most of it is minor and resolved; the body-area table above shows what overlaps with your claim.</p>${hList(fp)}</details>
+  </div>`;}
+function bindHealth(){document.querySelectorAll('[data-hk]').forEach(b=>b.onclick=()=>{HV.kind=b.dataset.hk;render();});
+  const dx=$('#hDx');if(dx)dx.onchange=()=>{HV.dx=dx.checked;render();};const s=$('#hSrc');if(s)s.onchange=()=>{HV.src=s.value;render();};
+  const q=$('#hQ');if(q){q.oninput=()=>{clearTimeout(q._t);q._t=setTimeout(()=>{HV.q=q.value;render();const n=$('#hQ');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length);}},250);};}}
+
+const VIEWS={health:[vHealth,bindHealth],calc:[vCalc,()=>{bindCalc();bindCharts();}],debt:[vDebt,bindDebt],money:[vMoney,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup],dates:[vDates,bindDates],save:[vSave,bindSave],cal:[vCal,bindCal],spend:[vSpend,()=>bindCharts()],rw:[vRewards,bindRewards],dream:[vDream,bindDream],wish:[vWish,bindWish],credit:[vCredit,bindCredit]};
 function gBar(){ // the plan choices, the same on every tab
   if(!S.plan||!S.plan.options)return '';const V=planView(),P=S.plan;let R;try{R=calcResult();}catch(e){R={rounded:'?'};}
   return `<div class="gbar" role="group" aria-label="Plan choices used on every tab">
