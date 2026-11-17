@@ -60,9 +60,14 @@ header.top{padding-block:20px 12px;display:flex;flex-wrap:wrap;gap:12px;align-it
 .gbar .g{display:flex;flex-direction:column;gap:4px;padding-left:8px;border-left:3px solid var(--line)}
 .gbar .g-duty{border-left-color:var(--duty)}.gbar .g-study{border-left-color:var(--study)}
 .gbar .seg .btn{padding:3px 9px}
-nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px}
-nav.tabs button{font:600 .95rem var(--f-display);letter-spacing:.06em;text-transform:uppercase;background:none;border:0;color:var(--ink-2);padding:12px 10px 10px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
-nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);margin-inline:-16px;padding-inline:16px}
+nav.tabs .tgroups{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:10px 0 6px}
+nav.tabs .tg{font:600 .88rem var(--f-display);letter-spacing:.05em;text-transform:uppercase;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2);padding:7px 12px;border-radius:999px;cursor:pointer;white-space:nowrap}
+nav.tabs .tg.tg-duty::before,nav.tabs .tg.tg-money::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:1px;background:var(--duty)}nav.tabs .tg.tg-money::before{background:var(--s3)}
+nav.tabs .tg.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+nav.tabs .tsub{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+nav.tabs .tsub button{font:600 .95rem var(--f-display);letter-spacing:.06em;text-transform:uppercase;background:none;border:0;color:var(--ink-2);padding:12px 10px 10px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+nav.tabs .tsub button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
 nav.tabs button:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 section.view{padding-top:20px}
 section.view>.stack{gap:16px}
@@ -175,6 +180,7 @@ details.panel>summary{cursor:pointer}
 .hsvcp{border-left:4px solid var(--duty)}.hprep{border-left:4px solid var(--ink-3)}
 .htab{border-collapse:collapse;width:100%;font-size:.88rem}.htab th,.htab td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
 @media (max-width:560px){.hrow{grid-template-columns:1fr}.hyear{grid-template-columns:1fr}}
+.refrow{display:flex;gap:12px;justify-content:space-between;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}.refrow.na{opacity:.55}.refrow.na b{text-decoration:line-through}.refna{display:flex;gap:6px;align-items:center;white-space:nowrap}.refh{font:600 1.05rem var(--f-display);letter-spacing:.04em;text-transform:uppercase}details.refg summary{cursor:pointer}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.tile{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface-2)}
 .tbig{font-family:var(--f-display);font-weight:700;font-size:1.8rem;line-height:1.1;font-variant-numeric:tabular-nums}
 .warnbox{background:var(--warn-bg);border-left:4px solid var(--warn);padding:8px 10px;border-radius:6px}
@@ -374,11 +380,20 @@ function progress(){
 }
 
 /* ---------- Tabs ---------- */
-const TABS=[['dash','Dashboard'],['cal','Calendar'],['rw','Rewards'],['steps','Steps'],['me','About me'],['conds','Conditions'],['scan','Scan records'],['health','Health timeline'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents'],['dates','Deadlines'],['calc','Calculator'],['debt','Debt plan'],['money','Money charts'],['save','Savings & taxes'],['credit','Credit score'],['spend','Spending'],['wish','Wishlist'],['backup','Backup & help']];
-function renderTabs(){
-  $('#tabs').innerHTML=TABS.map(([id,n])=>`<button role="tab" id="tab-${id}" aria-selected="${S.tab===id}" data-tab="${id}">${n}</button>`).join('');
+const TABGROUPS=[
+ ['home','Home','',[['dash','Dashboard'],['cal','Calendar'],['dates','Deadlines'],['rw','Rewards']]],
+ ['claim','VA claim','duty',[['steps','Steps'],['me','About me'],['conds','Conditions'],['ref','Ratings guide'],['wits','Witnesses'],['expo','Exposure'],['docs','Documents']]],
+ ['records','Health records','duty',[['health','Health timeline'],['scan','Scan records']]],
+ ['money','Retirement & money','money',[['calc','Retirement & rating'],['debt','Debt plan'],['money','Money charts'],['save','Savings & taxes'],['credit','Credit score'],['spend','Spending'],['wish','Wishlist']]],
+ ['help','Backup','',[['backup','Backup & help']]]];
+const TABS=TABGROUPS.flatMap(g=>g[3]);
+function tabGroup(id){return TABGROUPS.find(g=>g[3].some(t=>t[0]===id))||TABGROUPS[0];}
+function renderTabs(){const cur=tabGroup(S.tab);S.navLast=S.navLast||{};S.navLast[cur[0]]=S.tab;
+  $('#tabs').innerHTML=`<div class="tgroups">${TABGROUPS.map(g=>`<button class="tg${g===cur?' on':''}${g[2]?' tg-'+g[2]:''}" data-tgrp="${g[0]}" aria-expanded="${g===cur}">${g[1]}</button>`).join('')}</div>
+   <div class="tsub" role="tablist">${cur[3].map(([id,n])=>`<button role="tab" id="tab-${id}" aria-selected="${S.tab===id}" data-tab="${id}">${n}</button>`).join('')}</div>`;
 }
-function go(tab){S.tab=tab;save(true);render();window.scrollTo({top:0});}
+document.addEventListener('click',e=>{const g=e.target.closest('[data-tgrp]');if(!g)return;const G=TABGROUPS.find(x=>x[0]===g.dataset.tgrp);S.navLast=S.navLast||{};const last=S.navLast[G[0]];go(G[3].some(t=>t[0]===last)?last:G[3][0][0]);});
+function go(tab){S.tab=tab;S.navLast=S.navLast||{};S.navLast[tabGroup(tab)[0]]=tab;save(true);render();window.scrollTo({top:0});}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b){go(b.dataset.tab);}});
 
 function renderBanner(){
@@ -2066,7 +2081,143 @@ function bindHealth(){document.querySelectorAll('[data-hk]').forEach(b=>b.onclic
   const dx=$('#hDx');if(dx)dx.onchange=()=>{HV.dx=dx.checked;render();};const s=$('#hSrc');if(s)s.onchange=()=>{HV.src=s.value;render();};
   const q=$('#hQ');if(q){q.oninput=()=>{clearTimeout(q._t);q._t=setTimeout(()=>{HV.q=q.value;render();const n=$('#hQ');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length);}},250);};}}
 
-const VIEWS={health:[vHealth,bindHealth],calc:[vCalc,()=>{bindCalc();bindCharts();}],debt:[vDebt,bindDebt],money:[vMoney,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup],dates:[vDates,bindDates],save:[vSave,bindSave],cal:[vCal,bindCal],spend:[vSpend,()=>bindCharts()],rw:[vRewards,bindRewards],dream:[vDream,bindDream],wish:[vWish,bindWish],credit:[vCredit,bindCredit]};
+/* ---------- VA ratings guide: what VA rates, by body system (38 CFR Part 4), with a "not for me" switch ---------- */
+const REF=[
+ ['spine','Back and neck','4.71a',[
+  ['Low back strain or sprain','5237','10% to 100%. Rated by forward bending: 10% for 60 to 85 degrees, 20% for 30 to 60, 40% for 30 or less. Pain, flare-ups and repeated use count.','back|lumbar'],
+  ['Arthritis of the spine','5242','Same back and neck formula as a strain, by how far you can bend and turn.','back|lumbar|neck'],
+  ['Disc problems (intervertebral disc syndrome)','5243','Rated by the back formula, or by days of doctor-ordered bed rest a year (10% to 60%), whichever is higher.','back|lumbar|disc'],
+  ['Spinal stenosis or spondylolisthesis','5238 / 5239','Back and neck formula.',''],
+  ['Neck strain','5237','10% to 100%. Neck bending forward: 10% for 30 to 40 degrees, 20% for 15 to 30, 30% for 15 or less.','neck'],
+  ['Sacroiliac (SI joint) injury','5236','Back formula.',''],
+  ['Nerve pain into a leg (sciatica, radiculopathy)','8520','Rated on its own for each leg: 10% mild, 20% moderate, 40% moderately severe, 60% severe, 80% paralysis.','sciatica|radicul'],
+  ['Nerve pain into an arm (cervical radiculopathy)','8510 to 8513','Rated on its own for each arm, mild to severe.',''] ]],
+ ['upper','Shoulders, arms and hands','4.71a',[
+  ['Shoulder: limited motion (impingement, rotator cuff)','5201','20% if you cannot raise the arm above shoulder level; 20% to 30% at midway; 30% to 40% at 25 degrees from the side (higher number for your dominant arm). Painful motion alone is usually 10%.','shoulder'],
+  ['Shoulder: dislocations or instability','5202','20% to 80% depending on how often it slips out and how much it limits you.','shoulder'],
+  ['Collarbone or AC joint','5203','10% to 20%.',''],
+  ['Elbow: bending or straightening limited (tendinitis, tennis elbow)','5206 / 5207','Bending limited to 100 degrees is 10%; straightening limited to 45 degrees is 10%. Higher with more loss.','elbow'],
+  ['Forearm turning (supination, pronation)','5213','10% to 40%.',''],
+  ['Wrist: limited motion','5215','10% if you cannot bend it back to 15 degrees or forward toward the forearm.','wrist'],
+  ['Carpal tunnel syndrome','8515','Nerve rating for each hand: 10% mild up to 70% for complete paralysis.','wrist|carpal'],
+  ['Fingers and thumb: limited motion','5228 to 5230','0% to 20% depending on which finger and how much motion is lost.',''],
+  ['Trigger finger, tendon problems (tenosynovitis)','5024','Rated by how the joint moves.',''] ]],
+ ['lower','Hips, knees and ankles','4.71a',[
+  ['Hip: limited bending','5252','10% for bending limited to 45 degrees, up to 40% at 10 degrees.','hip'],
+  ['Hip: limited turning or spreading','5253','10% if you cannot turn the toes in more than 15 degrees or cross your legs; 20% for more loss.','hip'],
+  ['Knee: limited bending','5260','0% at 60 degrees, 10% at 45, 20% at 30, 30% at 15. Painful motion alone is usually 10%.','knee'],
+  ['Knee: cannot straighten fully','5261','10% at 10 degrees short, up to 50% at 45. Rated separately from bending.','knee'],
+  ['Knee: instability (giving way)','5257','10% slight, 20% moderate, 30% severe. Needs a test or a brace prescription.','knee'],
+  ['Knee: torn meniscus or cartilage','5258 / 5259','20% for locking, swelling and pain; 10% after surgery with symptoms.','knee'],
+  ['Kneecap and patellar tendon (tendinitis, chondromalacia)','5024 / 5299','Rated by how the knee moves.','knee|patell'],
+  ['Shin splints or tibia problems','5262','10% to 40%.',''],
+  ['Ankle: limited motion','5271','10% moderate, 20% marked. Stiffness, cracking and pain on motion count toward the exam.','ankle'],
+  ['Achilles tendinitis','5024 / 5271','Rated by how the ankle moves.',''] ]],
+ ['feet','Feet','4.71a',[
+  ['Flat feet (pes planus)','5276','0% mild; 10% moderate (one or both); 30% to 50% severe on both sides.','flat'],
+  ['Plantar fasciitis','5269','10% for one or both feet with pain that treatment does not fully fix; 20% to 40% for worse or both feet not helped.','plantar|heel'],
+  ['Bunions (hallux valgus)','5280','10% if severe or after surgery.',''],
+  ['Hammer toes, claw foot','5282 / 5278','0% to 50%.',''],
+  ['Metatarsalgia (ball of foot pain)','5279','10%.',''],
+  ['Other foot injuries','5284','10% moderate, 20% moderately severe, 30% severe.',''] ]],
+ ['joints','Arthritis and muscles','4.71a / 4.73',[
+  ['Degenerative arthritis (osteoarthritis)','5003','Rated by motion in each joint; 10% to 20% with X-ray proof in 2 or more joints when motion is not limited enough.','arthritis'],
+  ['Rheumatoid or other inflammatory arthritis','5002','20% to 100% by flare-ups and how much it limits you.',''],
+  ['Gout','5017','Like arthritis.',''],
+  ['Fibromyalgia','5025','10% to 40% by how often pain and fatigue are present.',''],
+  ['Muscle injuries (shrapnel, tears)','5301 to 5329','Rated by muscle group: slight, moderate, moderately severe or severe.',''] ]],
+ ['ears','Ears and hearing','4.85 / 4.87',[
+  ['Hearing loss','6100','0% to 100% from the hearing test (pure tones plus word understanding). One ear alone is usually 0%, but it covers hearing aids.','hearing'],
+  ['Tinnitus (ringing)','6260','10%, one rating for both ears. It must come back regularly; it does not need to be constant.','tinnitus|ringing'],
+  ['Meniere\'s disease','6205','30% to 100%.',''],
+  ['Vertigo or balance problems (vestibular)','6204','10% for occasional dizziness, 30% with staggering.',''],
+  ['Chronic ear infections or drainage','6200','10% while it drains.',''] ]],
+ ['eyes','Eyes','4.79',[
+  ['Loss of sharpness (visual acuity)','6061 to 6066','0% to 100% from your best corrected vision.',''],
+  ['Loss of side vision (visual field)','6080','10% to 100%.',''],
+  ['Dry eye, eyelid and other eye diseases','6000 to 6091','Rated by vision loss, or by weeks of treatment for flare-ups (10% to 60%).',''] ]],
+ ['nose','Nose, sinuses and throat','4.97',[
+  ['Chronic sinusitis','6510 to 6514','0% on X-ray only; 10% for 1 to 2 long infections or 3 to 6 short ones a year; 30% to 50% for more or after surgery. PACT Act presumptive for Iraq.','sinus'],
+  ['Chronic or allergic rhinitis','6522','10% if more than half of both sides (or all of one side) is blocked; 30% with polyps. PACT Act presumptive for Iraq.','sinus|rhinit|nasal'],
+  ['Deviated septum (from injury)','6502','10% with blockage.','sinus'],
+  ['Chronic laryngitis','6516','10% to 30%.',''] ]],
+ ['lungs','Lungs, breathing and sleep','4.97',[
+  ['Asthma','6602','10% to 100% by breathing test (FEV1) and how much medicine you need. PACT Act presumptive for Iraq.',''],
+  ['COPD, chronic bronchitis, emphysema','6600 / 6603 / 6604','10% to 100% by breathing test. PACT Act presumptive for Iraq.',''],
+  ['Constrictive bronchiolitis, other lung disease','6600 / 6845','By breathing test.',''],
+  ['Sleep apnea','6847','0% with no symptoms; 30% for daytime sleepiness; 50% when a CPAP is needed; 100% with breathing failure. VA has proposed changing this.','sleep|apnea'] ]],
+ ['heart','Heart and blood vessels','4.104',[
+  ['High blood pressure','7101','10% for diastolic usually 100 or more (or history and needs medicine); up to 60%.',''],
+  ['Heart disease','7005 and others','10% to 100% by exercise ability (METs) on a stress test.',''],
+  ['Irregular heartbeat (SVT, palpitations)','7010 / 7011','10% to 30% by how often episodes happen.',''],
+  ['Varicose veins','7120','0% to 100% for each leg.',''] ]],
+ ['gut','Stomach and digestion','4.114',[
+  ['Acid reflux (GERD)','7206','Rated as narrowing of the esophagus since 2024: 0% with no narrowing; 10% and up when you need daily medicine for narrowing or stretching procedures.','reflux|gerd'],
+  ['Irritable bowel syndrome (IBS)','7319','0% to 30% by days a month with belly pain and bowel changes.',''],
+  ['Hernia (umbilical, inguinal, ventral)','7338 / 7339','0% if repaired with no recurrence; 20% to 60% for one that comes back or a weak wall. A painful scar is rated separately.','hernia'],
+  ['Hemorrhoids','7336','0% to 20%.',''],
+  ['Ulcers, gallbladder, liver','7304 / 7318 / 7345','By symptoms and treatment.',''] ]],
+ ['gu','Kidneys, bladder and genitals','4.115',[
+  ['Kidney disease','7530','0% to 100% by lab tests and dialysis.',''],
+  ['Frequent urination, leaking (voiding dysfunction)','7542','10% to 60%.',''],
+  ['Repeat urinary tract infections','7512','10% to 30% by treatment needed.',''],
+  ['Testicle or epididymis problems (cysts, pain)','7523 / 7525','Often 0%; chronic epididymitis is rated like a urinary infection (10% to 30%).','epididym|testic|cyst'],
+  ['Erectile dysfunction','7522','0% plus extra monthly pay (SMC-K). Can be secondary to medicines like SSRIs.',''] ]],
+ ['skin','Skin and scars','4.118',[
+  ['Painful or unstable scars','7804','10% for 1 or 2, 20% for 3 or 4, 30% for 5 or more.','scar|hernia|lipoma'],
+  ['Large scars on the body','7801 / 7802','10% to 40% by size.','scar'],
+  ['Scars on the head, face or neck','7800','10% to 80%.',''],
+  ['Eczema, dermatitis, psoriasis','7806 / 7816','0% to 60% by how much skin is involved and what treatment is needed.',''],
+  ['Acne or chloracne','7828 / 7829','0% to 30%.',''] ]],
+ ['neuro','Brain and nerves','4.124a',[
+  ['Migraines and headaches','8100','0% to 50% by how often prostrating attacks (you must stop and lie down) happen.','headache|migraine'],
+  ['Traumatic brain injury (TBI)','8045','0% to 100% by the TBI checklist (memory, attention, mood, headaches).',''],
+  ['Peripheral neuropathy (arms or legs)','8510 to 8730','Mild to complete, rated for each nerve.','sciatica'],
+  ['Seizures','8910 / 8911','10% to 100%.',''] ]],
+ ['mind','Mental health','4.130',[
+  ['PTSD, anxiety, depression, panic disorder','9400 to 9440','One rating for all mental health together: 0%, 10%, 30%, 50%, 70% or 100%, by how symptoms affect work, relationships and daily life.','anxiety|depress|panic|mental'],
+  ['Insomnia and sleep problems from mental health','9400 to 9440','Counted inside the mental health rating.','anxiety|depress'],
+  ['Eating disorders','9520 / 9521','0% to 100%.',''] ]],
+ ['endo','Hormones and blood','4.119 / 4.117',[
+  ['Diabetes type 2','7913','10% to 100% by treatment (diet, pills, insulin) and complications.',''],
+  ['Thyroid problems','7900 to 7903','By symptoms and treatment.',''],
+  ['Anemia and blood disorders','7700 and others','By lab values and symptoms.',''] ]],
+ ['expo','Toxic exposure (PACT Act, Gulf War)','3.320 / 3.317',[
+  ['Burn pit presumptive breathing conditions','Various','Asthma, chronic sinusitis, chronic rhinitis, COPD, chronic bronchitis, emphysema and others are presumed caused by service in Iraq and other locations. No nexus letter needed.','sinus'],
+  ['Burn pit presumptive cancers','Various','Many cancers, including respiratory, head and neck, kidney and others, rated 100% during treatment.',''],
+  ['Gulf War unexplained illness','8850s','Chronic fatigue, fibromyalgia, IBS and other unexplained symptoms for Southwest Asia service.',''],
+  ['Airborne Hazards and Open Burn Pit Registry','Not a rating','Free to join; documents your exposure.',''] ]],
+ ['jaw','Teeth and jaw','4.150',[
+  ['Jaw joint (TMJ)','9905','10% to 50% by how wide you can open and side-to-side motion.',''],
+  ['Lost teeth from jaw bone loss (injury, disease)','9913','0% to 40%. Gum disease and cavities only qualify for VA dental treatment, not a rating.',''] ]],
+ ['other','Cancers and special pay','4.16 / 3.350',[
+  ['Active cancer','Various','100% during treatment and for 6 months after; then rated by what remains.',''],
+  ['Unemployability (TDIU)','4.16','Paid at 100% if you cannot hold steady work: one condition at 60% or more, or a combined 70% with one at 40%.',''],
+  ['Special monthly compensation (SMC)','3.350','Extra pay for loss of use of a body part or organ (for example SMC-K for erectile dysfunction) or needing help from others.',''],
+  ['Bilateral factor','4.26','When both arms or both legs are rated, VA adds 10% of their combined value. The Calculator does this for you.',''] ]]];
+const RV={q:'',hideNA:false,open:{}};
+function refMine(k){if(!k)return [];const r=new RegExp(k,'i');return S.conditions.filter(c=>r.test(c.name||''));}
+function vRef(){const NA=S.refNA=S.refNA||{},q=RV.q.toLowerCase();let total=0,na=0;
+  const groups=REF.map(([gid,gn,cfr,items])=>{const rows=items.map((it,i)=>{const key=gid+':'+i,isNA=!!NA[key],mine=refMine(it[3]);total++;if(isNA)na++;
+      if(RV.hideNA&&isNA)return '';if(q&&![gn,it[0],it[1],it[2]].join(' ').toLowerCase().includes(q))return '';
+      return `<div class="refrow${isNA?' na':''}"><div class="stack" style="gap:3px"><div><b>${esc(it[0])}</b> <span class="small muted">DC ${esc(it[1])}</span></div><div class="small">${esc(it[2])}</div>
+        ${mine.length?`<div class="row" style="gap:6px;flex-wrap:wrap">${mine.map(c=>`<button class="chip duty" data-tab="conds">On your claim: ${esc(c.name.length>48?c.name.slice(0,46)+'…':c.name)}</button>`).join('')}</div>`:''}</div>
+        <label class="refna small"><input type="checkbox" data-na="${key}" ${isNA?'checked':''}> Not for me</label></div>`;}).filter(Boolean);
+    if(!rows.length)return '';const cnt=items.filter((_,i)=>!NA[gid+':'+i]).length,mineN=items.filter(it=>refMine(it[3]).length).length;
+    return `<details class="panel stack refg" ${RV.open[gid]||q?'open':''} data-g="${gid}"><summary><span class="refh">${esc(gn)}</span> <span class="small muted">${cnt} of ${items.length} apply${mineN?` · ${mineN} on your claim`:''} · 38 CFR ${esc(cfr)}</span></summary><div class="stack" style="gap:8px;margin-top:10px">${rows.join('')}</div></details>`;}).join('');
+  return `<div class="stack"><h2>VA ratings guide</h2>
+   <p class="muted">What VA rates, grouped by body system, with the usual percent steps from VA's rating schedule (38 CFR Part 4). Tick <b>Not for me</b> on anything that does not apply; it is saved in this file. Items with an olive chip are already on your claim. These are short summaries: the exam and the full rule decide your rating.</p>
+   <div class="panel row" style="gap:12px;flex-wrap:wrap;align-items:center"><input id="refQ" type="search" placeholder="Search: knee, sinus, scar..." value="${esc(RV.q)}" style="flex:1;min-width:180px">
+    <label class="row small" style="gap:6px"><input type="checkbox" id="refHide" ${RV.hideNA?'checked':''}> Hide "not for me" (${na})</label>
+    <button class="btn sm" id="refOpen">Open all</button><button class="btn sm" id="refClose">Close all</button></div>
+   ${groups||'<p class="muted">Nothing matches.</p>'}</div>`;}
+function bindRef(){document.querySelectorAll('[data-na]').forEach(x=>x.onchange=()=>{S.refNA=S.refNA||{};if(x.checked)S.refNA[x.dataset.na]=true;else delete S.refNA[x.dataset.na];save();render();});
+  document.querySelectorAll('details.refg').forEach(d=>d.addEventListener('toggle',()=>{RV.open[d.dataset.g]=d.open;}));
+  const h=$('#refHide');if(h)h.onchange=()=>{RV.hideNA=h.checked;render();};
+  const o=$('#refOpen');if(o)o.onclick=()=>{REF.forEach(g=>RV.open[g[0]]=true);render();};const c=$('#refClose');if(c)c.onclick=()=>{RV.open={};render();};
+  const q=$('#refQ');if(q)q.oninput=()=>{clearTimeout(q._t);q._t=setTimeout(()=>{RV.q=q.value;render();const n=$('#refQ');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length);}},250);};}
+
+const VIEWS={ref:[vRef,bindRef],health:[vHealth,bindHealth],calc:[vCalc,()=>{bindCalc();bindCharts();}],debt:[vDebt,bindDebt],money:[vMoney,bindDebt],scan:[vScan,bindScan],dash:[vDash,bindDash],steps:[vSteps,bindSteps],me:[vMe,bindMe],conds:[vConds,bindConds],wits:[vWits,bindWits],expo:[vExpo,bindExpo],docs:[vDocs,bindDocs],backup:[vBackup,bindBackup],dates:[vDates,bindDates],save:[vSave,bindSave],cal:[vCal,bindCal],spend:[vSpend,()=>bindCharts()],rw:[vRewards,bindRewards],dream:[vDream,bindDream],wish:[vWish,bindWish],credit:[vCredit,bindCredit]};
 function gBar(){ // the plan choices, the same on every tab
   if(!S.plan||!S.plan.options)return '';const V=planView(),P=S.plan;let R;try{R=calcResult();}catch(e){R={rounded:'?'};}
   return `<div class="gbar" role="group" aria-label="Plan choices used on every tab">
